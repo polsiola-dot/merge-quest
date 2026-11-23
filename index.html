@@ -137,6 +137,22 @@
   .board-list .tl { color: var(--muted); font-size: 12px; text-align: right; }
   .board-empty { color: var(--muted); font-size: 14px; }
   #bestBox { cursor: pointer; }
+  .goal { color: var(--text); font-weight: 700; }
+  .goal b { color: var(--accent); }
+  .lv-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .lv {
+    aspect-ratio: 1; padding: 0; border-radius: 12px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px; font-size: 17px; font-weight: 800;
+    background: var(--panel-2); position: relative;
+  }
+  .lv .st { font-size: 10px; letter-spacing: 1px; color: var(--accent); min-height: 12px; }
+  .lv.next { background: var(--accent); color: #1a1533; }
+  .lv.next .st { color: #1a1533; }
+  .lv.hard::after { content: 'HARD'; position: absolute; top: -6px; right: -4px; font-size: 8px;
+    background: #e5484d; color: #fff; border-radius: 6px; padding: 1px 4px; letter-spacing: .05em; }
+  .stars { font-size: 34px; letter-spacing: 6px; color: var(--accent); }
+  .stars .off { color: #4a4470; }
+  .tag { font-size: 12px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
   #infBox { flex: 0 0 auto; min-width: 58px; padding: 6px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
   #infBox b { font-size: 15px; color: var(--accent); }
   #infBox b::before { content: '×'; font-size: 12px; opacity: .8; margin-right: 1px; }
@@ -168,7 +184,7 @@
   }
   .wallet.bump { transform: scale(1.15); }
   .wallet { position: relative; }
-  #coinLayer { position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+  #coinLayer { position: fixed; inset: 0; pointer-events: none; z-index: 11; overflow: hidden; }
   .fcoin {
     position: absolute; left: 0; top: 0; width: 24px; height: 24px; margin: -12px 0 0 -12px;
     border-radius: 50%; will-change: transform;
@@ -207,7 +223,7 @@
   <header>
     <div class="title">MERGE<br><span>QUEST</span></div>
     <div class="stat"><small>Score</small><b id="score">0</b></div>
-    <div class="stat" id="bestBox" title="Scoreboard"><small>Best 🏆</small><b id="best">0</b></div>
+    <div class="stat" id="bestBox" title="Scoreboard"><small id="bestLabel">Best 🏆</small><b id="best">0</b></div>
     <div class="stat" id="infBox" title="∞ blocks collected"><span class="infIcon">∞</span><b id="infCount">0</b></div>
   </header>
   <div id="wrap"><canvas id="c"></canvas></div>
@@ -222,7 +238,7 @@
     <div class="next">Next <div id="nextTile"></div><div id="nextTile2" title="After that"></div></div>
     <button id="swapBtn" title="Switch current and next tile (S) — free">⇅ Switch</button>
     <button id="helpBtn" title="How to play">?</button>
-    <button id="newBtn" title="New game (N)">New</button>
+    <button id="newBtn" title="Menu (M)">Menu</button>
   </footer>
 </div>
 
@@ -235,8 +251,12 @@
 (() => {
   'use strict';
 
-  const COLS = 5, ROWS = 7;
-  const SAVE_KEY = 'mergeQuest.save.v1';
+  let cols = 5, rows = 7;          // board size: 5x7 in Endless, set per level in Level mode
+  const MAX_CELL = 96;             // small level boards don't blow up to giant tiles
+  const SAVE_KEY = 'mergeQuest.save.v1';           // Endless game in progress
+  const LEVEL_SAVE_KEY = 'mergeQuest.levelSave.v1';  // level attempt in progress
+  const MODE_KEY = 'mergeQuest.mode.v1';
+  const saveKey = (m = mode) => (m === 'level' ? LEVEL_SAVE_KEY : SAVE_KEY);
   const BEST_KEY = 'mergeQuest.best.v1';
   const COIN_KEY = 'mergeQuest.coins.v1';
   const BOARD_KEY = 'mergeQuest.scoreboard.v1';
@@ -295,9 +315,11 @@
   // ---------- state ----------
   let grid, cur, nxt, nxt2, shooter, score, best, maxV, minE, over;
   let bag = [], bagKey = '';          // shuffled launch bag (fairer than pure random)
-  let rescueUsed = false, freeHammer = false;  // one free Hammer per game when stuck
-  let toolFree = false;               // the Hammer now armed is the free rescue one
+  let rescueUsed = false;            // Endless: one free Hammer per game when stuck
+  let freeUses = { hammer: 0, swap: 0, undo: 0 };  // free helper uses (rescue, level samples)
   let aim = 2, busy = false;
+  let mode = store.get(MODE_KEY) === 'level' ? 'level' : 'endless';
+  let lv = null;                     // current level attempt (Level mode only)
   let ghosts = [], floaters = [], banner = null, shake = null, praise = null;
   let flyers = [], bubbles = [];  // shots heading for a full column; merge bubbles
   let tool = null, sel = null;      // active helper ('swap' | 'hammer') and first swap pick
@@ -368,22 +390,23 @@
   const resetShooter = () => { shooter = newTile(cur, cellX(aim), launchY()); };
 
   // ---------- layout ----------
-  let W = 0, H = 0, dpr = 1, cell = 40, bx = 0, by = 0;
+  let W = 0, H = 0, dpr = 1, cell = 40, bx = 0, by = 0, layoutKey = '';
   // Returns false when the size is unchanged (several resize signals can fire at once).
   function layout() {
-    const r = wrap.getBoundingClientRect(), d = window.devicePixelRatio || 1;
-    if (r.width === W && r.height === H && d === dpr) return false;
+    const r = wrap.getBoundingClientRect(), d = window.devicePixelRatio || 1, key = cols + 'x' + rows;
+    if (r.width === W && r.height === H && d === dpr && key === layoutKey) return false;
+    layoutKey = key;
     dpr = d;
     W = r.width; H = r.height;
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    cell = Math.floor(Math.min(W / COLS, H / (ROWS + 1.35)));
-    bx = (W - cell * COLS) / 2;
-    by = Math.max(0, (H - cell * (ROWS + 1.35)) / 2);
+    cell = Math.floor(Math.min(W / cols, H / (rows + 1.35), MAX_CELL));
+    bx = (W - cell * cols) / 2;
+    by = Math.max(0, (H - cell * (rows + 1.35)) / 2);
     return true;
   }
   const cellX = c => bx + c * cell;
   const cellY = r => by + r * cell;
-  const launchY = () => by + ROWS * cell + cell * 0.3;
+  const launchY = () => by + rows * cell + cell * 0.3;
 
   // ---------- board helpers ----------
   const count = c => { let n = 0; for (const t of grid[c]) if (t) n++; return n; };
@@ -392,8 +415,8 @@
 
   function landingRow(c, v) {
     const n = count(c);
-    if (n < ROWS) return n;
-    if (grid[c][ROWS - 1].v === v) return ROWS - 1; // merges into bottom tile
+    if (n < rows) return n;
+    if (grid[c][rows - 1].v === v) return rows - 1; // merges into bottom tile
     return -1;
   }
   const fits = v => grid.some((_, c) => landingRow(c, v) >= 0);
@@ -405,7 +428,7 @@
     const out = [];
     for (const [dc, dr] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
       const nc = c + dc, nr = r + dr;
-      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
       const o = grid[nc][nr];
       if (o && o.v === t.v) out.push([nc, nr]);
     }
@@ -415,9 +438,9 @@
   // Pushes every column's tiles up to the ceiling. Returns positions of tiles that moved.
   function compact() {
     const moved = [];
-    for (let c = 0; c < COLS; c++) {
+    for (let c = 0; c < cols; c++) {
       const col = grid[c].filter(Boolean);
-      for (let r = 0; r < ROWS; r++) {
+      for (let r = 0; r < rows; r++) {
         const t = col[r] || null;
         if (t && grid[c][r] !== t) moved.push([c, r]);
         grid[c][r] = t;
@@ -427,15 +450,15 @@
   }
 
   function find(t) {
-    for (let c = 0; c < COLS; c++)
-      for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < cols; c++)
+      for (let r = 0; r < rows; r++)
         if (grid[c][r] === t) return [c, r];
     return null;
   }
 
   // ---------- tile supply ----------
   // Current level from the biggest tile made: 0 until 4K, 1 until 4M, then 2.
-  const levelOf = mv => Math.min(2, tierOfE(log2(mv)));
+  const tierOf = mv => Math.min(2, tierOfE(log2(mv)));
   // Each level launches the previous level's 2048 plus 4…64 of its own units
   // (2…64, then 2048/4K…64K, then 2048K/4M…64M). The top of the range opens up
   // as your biggest tile grows; bigger values are rarer.
@@ -445,7 +468,7 @@
     return m;
   }
   function spawnRange() {
-    const k = levelOf(maxV), lo = 10 * k + 1;
+    const k = tierOf(maxV), lo = 10 * k + 1;
     if (k === 0) return [lo, Math.min(lo + 5, Math.max(lo + 2, log2(maxV) - 1))];
     // K and M levels: never launch anything bigger than the biggest block on the board
     return [lo, Math.min(lo + 5, Math.max(lo, boardMaxE()))];
@@ -457,6 +480,7 @@
   }
 
   function rollValue() {
+    if (mode === 'level') return levelRoll();
     const [lo, hi] = spawnRange();
     // While old-level blocks remain, often launch one of their values (more
     // likely for values you have several of): ~70% at first, easing to ~30%
@@ -472,6 +496,7 @@
 
   // Is v still a legal launch? (used when a previewed tile moves up the queue)
   function launchable(v) {
+    if (mode === 'level') return true;
     const [lo, hi] = spawnRange();
     if (v >= Math.pow(2, lo) && v <= Math.pow(2, hi)) return true;
     return oldBlocks().includes(v);
@@ -514,6 +539,13 @@
     updateHud();
   }
 
+  const priceOf = name => (freeUses[name] > 0 ? 0 : COST[name]);
+  // pay for a helper: a free use first, otherwise coins
+  function spend(name) {
+    if (freeUses[name] > 0) freeUses[name]--;
+    else setCoins(coins - COST[name]);
+  }
+
   function setCoins(n) {
     coins = Math.max(0, n);
     store.set(COIN_KEY, String(coins));
@@ -554,7 +586,7 @@
   function launchCoins(gain) {
     const n = Math.min(12, Math.max(1, Math.ceil(gain / 3)));
     const cr = cv.getBoundingClientRect();
-    const sx = cr.left + bx + cell * COLS / 2, sy = cr.top + by + cell * ROWS * 0.42 + cell * 0.6;
+    const sx = cr.left + bx + cell * cols / 2, sy = cr.top + by + cell * rows * 0.42 + cell * 0.6;
     const per = Math.floor(gain / n);
     let rest = gain - per * n;
     coinPending += gain;
@@ -658,7 +690,8 @@
   }
 
   function updateHud() {
-    const sTxt = shortScore(score), bTxt = shortScore(best);
+    const sTxt = shortScore(score), bTxt = mode === 'level' ? String(lv.n) : shortScore(best);
+    $('bestLabel').textContent = mode === 'level' ? 'Level' : 'Best 🏆';
     if (sTxt !== $('score').textContent || bTxt !== $('best').textContent) {
       $('score').textContent = sTxt;
       $('best').textContent = bTxt;
@@ -669,12 +702,22 @@
     paintMini($('nextTile'), nxt, [0, 15, 15, 14, 12, 10]);
     paintMini($('nextTile2'), nxt2, [0, 12, 12, 11, 9, 8]);
     const n = countTiles();
-    $('tSwap').disabled = busy || over || (coins < COST.swap && tool !== 'swap') || n < 2;
-    $('tHammer').disabled = busy || over || (coins < COST.hammer && tool !== 'hammer') || n < 1;
-    $('tUndo').disabled = busy || !snap || coins - lastEarned < COST.undo;
+    $('tSwap').disabled = busy || over || (coins < priceOf('swap') && tool !== 'swap') || n < 2;
+    $('tHammer').disabled = busy || over || (coins < priceOf('hammer') && tool !== 'hammer') || n < 1;
+    $('tUndo').disabled = busy || !snap || coins - lastEarned < priceOf('undo') || helpersOff();
+    if (helpersOff()) { $('tSwap').disabled = $('tHammer').disabled = true; }
+    $('swapBtn').disabled = busy || over || helpersOff();
+    for (const [id, name] of [['tSwap', 'swap'], ['tHammer', 'hammer'], ['tUndo', 'undo']])
+      $(id).querySelector('.pr').textContent = freeUses[name] > 0 ? 'Free ×' + freeUses[name] : COST[name];
     $('tSwap').classList.toggle('active', tool === 'swap');
     $('tHammer').classList.toggle('active', tool === 'hammer');
     const fitsCur = fits(cur);
+    if (mode === 'level' && !tool && !over) {
+      const L = levelDef();
+      $('hint').innerHTML = `<span class="goal">🎯 ${goalText(L, true)}</span>` +
+        (lv.shots ? ` · <b>${lv.shotsLeft}</b> shot${lv.shotsLeft === 1 ? '' : 's'} left` : '');
+      return;
+    }
     $('hint').textContent = tool === 'hammer' ? 'Tap a block to smash it (tap Hammer again to cancel).'
       : tool === 'swap' ? (sel ? 'Now tap the block to swap it with.' : 'Tap the first block to swap.')
       : over ? 'No moves left.'
@@ -751,8 +794,8 @@
     infCount++;
     store.set(INF_KEY, String(infCount));
     banner = { text: '∞ INFINITY BLOCK! #' + infCount, life: 2.4 };
-    const cols = ['#facc15', '#f472b6', '#22d3ee', '#a78bfa', '#ffffff'];
-    burst(t, 26, [1.5, 2.5], [0.05, 0.1], [0.8, 0.5], i => cols[i % cols.length]);
+    const hues = ['#facc15', '#f472b6', '#22d3ee', '#a78bfa', '#ffffff'];
+    burst(t, 26, [1.5, 2.5], [0.05, 0.1], [0.8, 0.5], i => hues[i % hues.length]);
     earn(500);                         // a new ∞ pays 500 coins
     const box = $('infBox');
     box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
@@ -768,9 +811,267 @@
     banner = { text: '∞ + ∞ cleared! +250 coins', life: 2 };
   }
 
-  // ---------- undo snapshots ----------
+  // ---------- Level mode ----------
+  // Boards grow from 2x2 to the full 5x7, one new idea per level. Levels 1-6
+  // use a fixed tile queue and generous shots so they can't really be lost.
+  // goal: [type, value] - make: a tile of value · score: points · combo: merges
+  // in one shot · merge: blocks in one merge · leave: <= value blocks left ·
+  // survive: use every shot without filling up. shots 0 = no limit.
+  // start: columns top-down · queue: fixed first tiles · spawn: max exponent
+  // for random tiles after that · free: free helper uses · hint: column to point at
+  const PROGRESS_KEY = 'mergeQuest.progress.v1';
+  const LEVELS = [
+    { cols: 2, rows: 2, goal: ['make', 8], shots: 5, start: [[2], []], queue: [2, 4, 2, 2, 4], hint: 0, reward: 50, intro: 'Tap a column to shoot. Equal numbers that touch merge!' },
+    { cols: 2, rows: 2, goal: ['make', 16], shots: 6, start: [[8, 2], []], queue: [4, 4, 2, 4, 2, 2], hint: 1, reward: 50, intro: 'A full column only takes a matching tile. Pick the other one.' },
+    { cols: 2, rows: 2, goal: ['merge', 3], shots: 3, start: [[4], [8, 4]], queue: [4, 2, 2], hint: 0, reward: 75, intro: 'Three blocks at once = ×4!' },
+    { cols: 2, rows: 3, goal: ['make', 32], shots: 8, start: [[], []], queue: [8, 8, 16, 4, 4, 2, 2, 2], reward: 75, intro: 'The bottom bar shows the next tiles. Plan ahead.' },
+    { cols: 2, rows: 3, goal: ['combo', 2], shots: 4, start: [[8, 4], []], queue: [4, 2, 2, 2], hint: 0, reward: 100, intro: 'One merge can set off another — a combo!' },
+    { cols: 2, rows: 3, goal: ['make', 64], shots: 8, start: [[32, 16, 8], [4, 2, 16]], queue: [2, 8, 4, 2, 4, 2, 2, 2], reward: 100, intro: 'Tile doesn\'t fit? Tap Switch to use the next one.' },
+    { cols: 3, rows: 3, goal: ['score', 100], shots: 15, spawn: 3, reward: 100, intro: 'From now on tiles are random. Score 100!' },
+    { cols: 3, rows: 3, goal: ['merge', 4], shots: 3, start: [[2, 8], [8], [4, 8]], queue: [8, 2, 2], hint: 1, reward: 150, intro: 'Four blocks at once = ×8!' },
+    { cols: 3, rows: 3, goal: ['leave', 2], shots: 6, start: [[4], [4, 2], []], queue: [2, 8, 4, 2, 2, 4], free: { undo: 3 }, reward: 150, intro: 'Merge the board down. 3 free Undos if you slip.' },
+    { cols: 3, rows: 5, goal: ['make', 128], shots: 35, spawn: 4, reward: 300, intro: 'Checkpoint! Use everything you know.' },
+    { cols: 4, rows: 4, goal: ['make', 128], shots: 22, spawn: 4, start: [[2, 16, 4], [8, 2], [16, 4, 2], [4]], free: { hammer: 1 }, reward: 150, intro: 'A free Hammer: tap it, then smash a block in the way.' },
+    { cols: 4, rows: 4, goal: ['score', 200], shots: 18, spawn: 5, free: { swap: 1 }, reward: 150, intro: 'A free Swap: trade any two blocks.' },
+    { cols: 4, rows: 5, goal: ['combo', 3], shots: 12, spawn: 4, start: [[32, 16, 8], [], [], []], reward: 200, intro: 'Build a staircase, then trigger it.' },
+    { cols: 4, rows: 5, goal: ['score', 220], shots: 20, spawn: 4, reward: 200 },
+    { cols: 4, rows: 5, goal: ['survive', 30], shots: 30, spawn: 6, start: [[2, 8, 32, 4], [16, 4, 2, 64], [8, 32, 4, 16], [4, 2, 8, 32]], hard: true, reward: 250, intro: 'Hard level: the board is nearly full. Last 30 shots!' },
+    { cols: 4, rows: 6, goal: ['make', 256], shots: 45, spawn: 6, reward: 250 },
+    { cols: 4, rows: 6, goal: ['make', 64], shots: 18, spawn: 4, reward: 250, intro: 'Fewer shots — make every one count.' },
+    { cols: 5, rows: 6, goal: ['make', 256], shots: 55, spawn: 5, reward: 300, intro: 'Five columns now. Use the middle!' },
+    { cols: 5, rows: 6, goal: ['merge', 3], shots: 20, spawn: 4, reward: 300, intro: 'Line up three of a kind around one spot.' },
+    { cols: 5, rows: 6, goal: ['make', 256], shots: 50, spawn: 5, noHelpers: true, hard: true, reward: 300, intro: 'Hard level: no helpers, no Switch. Just skill.' },
+    { cols: 5, rows: 7, goal: ['score', 400], shots: 30, spawn: 5, reward: 300, intro: 'The full board!' },
+    { cols: 5, rows: 7, goal: ['score', 600], shots: 35, spawn: 5, reward: 300 },
+    { cols: 5, rows: 7, goal: ['score', 750], shots: 45, spawn: 6, reward: 300 },
+    { cols: 5, rows: 7, goal: ['make', 2048], shots: 0, spawn: 6, reward: 1000, intro: 'Graduation: make a 2048! No shot limit.' },
+  ];
+  const levelDef = () => LEVELS[lv.n - 1];
+
+  function loadProgress() {
+    try {
+      const p = JSON.parse(store.get(PROGRESS_KEY) || 'null');
+      if (p && typeof p.stars === 'object') return { stars: p.stars, fails: p.fails || {} };
+    } catch (e) {}
+    return { stars: {}, fails: {} };
+  }
+  const saveProgress = pr => store.set(PROGRESS_KEY, JSON.stringify(pr));
+  // level n is open once the previous one is cleared (or skipped, stored as 0 stars)
+  const unlocked = (n, pr = loadProgress()) => n === 1 || pr.stars[n - 1] !== undefined;
+  const totalStars = pr => Object.values(pr.stars).reduce((a, b) => a + b, 0);
+
+  function goalText(L, withProgress) {
+    const [type, v] = L.goal;
+    const pr = withProgress && lv;
+    switch (type) {
+      case 'make': return `Make ${fmt(v)[0] === '8' ? 'an' : 'a'} <b>${fmt(v)}</b>`;
+      case 'score': return `Score <b>${v.toLocaleString()}</b>` + (pr ? ` (${score.toLocaleString()})` : '');
+      case 'combo': return `Make a <b>${v}-merge combo</b> in one shot`;
+      case 'merge': return `Merge <b>${v} blocks</b> at once`;
+      case 'leave': return `Leave <b>${v} or fewer</b> blocks` + (pr ? ` (now ${countTiles()})` : '');
+      case 'survive': return `Survive <b>${v} shots</b> without filling up`;
+    }
+    return '';
+  }
+
+  function goalMet() {
+    const [type, v] = levelDef().goal;
+    switch (type) {
+      case 'make': return maxV >= v;
+      case 'score': return score >= v;
+      case 'combo': return lv.bestCombo >= v;
+      case 'merge': return lv.bestMerge >= v;
+      case 'leave': return lv.used > 0 && countTiles() <= v;
+      case 'survive': return lv.shots > 0 && lv.shotsLeft <= 0;
+    }
+    return false;
+  }
+
+  function levelRoll() {
+    const L = levelDef();
+    if (L.queue && lv.qi < L.queue.length) return L.queue[lv.qi++];
+    return drawFromBag(1, L.spawn || 3);
+  }
+
+  function startLevel(n) {
+    const L = LEVELS[n - 1];
+    mode = 'level';
+    cols = L.cols; rows = L.rows;
+    layout();
+    const start = L.start || [];
+    setGrid(Array.from({ length: cols }, (_, c) => {
+      const col = start[c] || [];
+      return Array.from({ length: rows }, (_, r) => col[r] || 0);
+    }));
+    lv = { n, shots: L.shots, shotsLeft: L.shots, used: 0, qi: 0, bestCombo: 0, bestMerge: 0, result: null };
+    score = 0; minE = 1; oldStart = 0; over = false; busy = false;
+    maxV = Math.max(2, ...allTiles().map(t => t.v));
+    ghosts = []; floaters = []; flyers = []; bubbles = []; banner = null; praise = null;
+    tool = null; sel = null; snap = null; lastEarned = 0;
+    clearCoinFlights();
+    bag = []; bagKey = ''; rescueUsed = true;
+    freeUses = { hammer: 0, swap: 0, undo: 0, ...L.free };
+    cur = rollValue(); nxt = rollValue(); nxt2 = rollValue();
+    gameId = 'L' + n + '-' + Date.now().toString(36);
+    aim = L.hint !== undefined ? L.hint : Math.floor(cols / 2);
+    resetShooter();
+    save();
+    updateHud();
+    showLevelIntro();
+  }
+
+  function showLevelIntro() {
+    const L = levelDef();
+    const free = Object.entries(L.free || {}).map(([k, v]) => `${v} free ${k[0].toUpperCase() + k.slice(1)}${v > 1 ? 's' : ''}`);
+    showOverlay(`
+      <div class="tag">Level ${lv.n}${L.hard ? ' · Hard' : ''} · ${L.cols}×${L.rows} board</div>
+      <h2 class="goal">${goalText(L)}</h2>
+      ${L.intro ? `<p>${L.intro}</p>` : ''}
+      <p>${L.shots ? `<b>${L.shots}</b> shots` : 'No shot limit'}${free.length ? ' · ' + free.join(', ') : ''}</p>
+      <button class="primary" id="playBtn">Play</button>`);
+    $('playBtn').onclick = hideOverlay;
+  }
+
+  // After every play in Level mode: won, lost, or carry on?
+  function levelEnded() {
+    if (goalMet()) { levelWon(); return true; }
+    if (isStuck()) { levelLost('No room left'); return true; }
+    if (lv.shots && lv.shotsLeft <= 0) { levelLost('Out of shots'); return true; }
+    return false;
+  }
+
+  function starsFor() {
+    if (!lv.shots || levelDef().goal[0] === 'survive') return 3;
+    const left = lv.shotsLeft / lv.shots;
+    return left >= 0.4 ? 3 : left >= 0.15 ? 2 : 1;
+  }
+  const starHtml = n => `<div class="stars">${[1, 2, 3].map(i => i <= n ? '★' : '<span class="off">★</span>').join('')}</div>`;
+
+  function levelWon() {
+    over = true; tool = null; sel = null; snap = null;
+    lv.result = 'won';
+    const L = levelDef(), n = lv.n, stars = starsFor();
+    const pr = loadProgress(), prev = pr.stars[n];
+    // full reward the first time it's cleared (a skipped level counts as not cleared);
+    // after that, 10 coins for each new star
+    const firstClear = !(pr.cleared && pr.cleared[n]);
+    const reward = firstClear ? L.reward : Math.max(0, stars - (prev || 0)) * 10;
+    pr.stars[n] = Math.max(stars, prev || 0);
+    pr.cleared = { ...(pr.cleared || {}), [n]: true };
+    pr.fails[n] = 0;
+    saveProgress(pr);
+    store.del(LEVEL_SAVE_KEY);
+    if (reward) { setCoins(coins + reward); launchCoins(reward); }
+    banner = { text: n === LEVELS.length ? 'You graduated!' : 'Level complete!', life: 2 };
+    const last = n === LEVELS.length;
+    showOverlay(`
+      <div class="tag">Level ${n}</div>
+      <h2>${last ? '🎓 You graduated!' : 'Level complete!'}</h2>
+      ${starHtml(stars)}
+      ${reward ? `<p><span class="coin"></span> <b>+${reward}</b> coins</p>` : '<p>Replay for more stars!</p>'}
+      ${last ? '<p>You\'ve mastered every idea. Endless mode is the real test — see how far you get!</p>' : ''}
+      ${last ? '<button class="primary" id="endlessBtn">∞ Play Endless</button>' : '<button class="primary" id="nextBtn">Next level</button>'}
+      <div class="row"><button id="replayBtn">↻ Replay</button><button id="mapBtn">🗺️ Map</button></div>`);
+    if (last) $('endlessBtn').onclick = playEndless;
+    else $('nextBtn').onclick = () => startLevel(n + 1);
+    $('replayBtn').onclick = () => startLevel(n);
+    $('mapBtn').onclick = showMap;
+  }
+
+  function levelLost(why) {
+    over = true; tool = null; sel = null;
+    lv.result = 'lost';
+    const n = lv.n, pr = loadProgress();
+    pr.fails[n] = (pr.fails[n] || 0) + 1;
+    saveProgress(pr);
+    save();
+    const easy = n <= 6;
+    const canUndo = snap && coins - lastEarned >= priceOf('undo');
+    const canSkip = pr.fails[n] >= 3 && n < LEVELS.length && pr.stars[n] === undefined;
+    showOverlay(`
+      <div class="tag">Level ${n}</div>
+      <h2>${easy ? 'So close!' : why}</h2>
+      <p>${easy ? 'Have another go — you\'ve got this.' : goalText(levelDef())}</p>
+      <button class="primary" id="retryBtn">↻ Try again</button>
+      ${canUndo ? `<button id="goUndo">↶ Undo last shot${priceOf('undo') ? ` <span class="coin"></span> ${COST.undo}` : ' (free)'}</button>` : ''}
+      ${canSkip ? '<button id="skipBtn">Skip this level</button>' : ''}
+      <button id="mapBtn">🗺️ Map</button>`);
+    $('retryBtn').onclick = () => startLevel(n);
+    if (canUndo) $('goUndo').onclick = undo;
+    if (canSkip) $('skipBtn').onclick = () => { const p = loadProgress(); p.stars[n] = 0; saveProgress(p); startLevel(n + 1); };
+    $('mapBtn').onclick = showMap;
+  }
+
+  function showMap() {
+    if (busy) return;
+    const pr = loadProgress();
+    const next = LEVELS.findIndex((_, i) => pr.stars[i + 1] === undefined) + 1;
+    const cells = LEVELS.map((L, i) => {
+      const n = i + 1, open = unlocked(n, pr), st = pr.stars[n];
+      const cls = ['lv', n === next ? 'next' : '', L.hard ? 'hard' : ''].join(' ');
+      const label = n === LEVELS.length ? '🎓' : open ? n : '🔒';
+      return `<button class="${cls}" data-n="${n}" ${open ? '' : 'disabled'}>${label}<span class="st">${st === undefined ? '' : '★'.repeat(st) || '–'}</span></button>`;
+    }).join('');
+    showOverlay(`
+      <h2>🗺️ Levels</h2>
+      <p>★ ${totalStars(pr)} / ${LEVELS.length * 3}</p>
+      <div class="lv-grid">${cells}</div>
+      <div class="row"><button id="endlessBtn">∞ Endless</button><button id="closeBtn">Close</button></div>`);
+    for (const b of document.querySelectorAll('.lv[data-n]')) b.onclick = () => startLevel(+b.dataset.n);
+    $('endlessBtn').onclick = playEndless;
+    $('closeBtn').onclick = hideOverlay;
+  }
+
+  function playEndless() {
+    if (mode === 'level' && lv && !lv.result) save();   // keep the level attempt for later
+    mode = 'endless';
+    if (!load('endless')) newGame();
+    else if (isStuck()) gameOver();
+    else hideOverlay();
+    updateHud();
+  }
+
+  function showMenu() {
+    if (busy) return;
+    const pr = loadProgress();
+    showOverlay(`
+      <h2>Merge Quest</h2>
+      <button class="primary" id="mLevels">🗺️ Levels · ★ ${totalStars(pr)}/${LEVELS.length * 3}</button>
+      <button id="mEndless">∞ Endless</button>
+      <div class="row"><button id="mRestart">↻ ${mode === 'level' ? 'Restart level' : 'New game'}</button><button id="mHelp">How to play</button></div>
+      <button id="mBoard">🏆 Scoreboard</button>
+      <button id="closeBtn">Close</button>`);
+    $('mLevels').onclick = showMap;
+    $('mEndless').onclick = playEndless;
+    $('mRestart').onclick = () => (mode === 'level' ? startLevel(lv.n) : newGame());
+    $('mHelp').onclick = showHelp;
+    $('mBoard').onclick = showScoreboard;
+    $('closeBtn').onclick = hideOverlay;
+  }
+
+  // ---------- game state (one list, used by undo, save and load) ----------
+  function captureState() {
+    return { cols, rows, g: gridValues(), cur, nxt, nxt2, score, maxV, minE, oldStart,
+      rescueUsed, freeUses: { ...freeUses }, mode, lv: lv && { ...lv } };
+  }
+  function applyState(d) {
+    cols = d.cols || 5; rows = d.rows || 7;
+    aim = Math.min(aim, cols - 1);     // keep the aim on a narrower board
+    layout();
+    setGrid(d.g);
+    ({ cur, nxt, score, maxV } = d);
+    minE = d.minE || 1;
+    nxt2 = d.nxt2 || rollValue();       // tolerate saves missing newer fields
+    oldStart = d.oldStart || 0;
+    rescueUsed = !!d.rescueUsed;
+    freeUses = { hammer: 0, swap: 0, undo: 0, ...d.freeUses };
+    mode = d.mode || 'endless';
+    lv = d.lv ? { ...d.lv } : null;
+    resetShooter();
+  }
+
   function takeSnap() {
-    snap = { g: gridValues(), cur, nxt, nxt2, score, maxV, minE, inf: infCount, oldStart, rescueUsed, freeHammer };
+    snap = { ...captureState(), inf: infCount };
     lastEarned = 0;
   }
 
@@ -779,18 +1080,16 @@
   }
 
   function undo() {
-    if (busy || !snap) return;
+    if (busy || !snap || helpersOff()) return;
     // coins earned by the undone play are taken back, so undo can't be farmed
-    if (coins - lastEarned < COST.undo) return;
+    const price = priceOf('undo');
+    if (coins - lastEarned < price) return;
+    const freeUndos = freeUses.undo;
     clearCoinFlights();
-    setCoins(coins - lastEarned - COST.undo);
-    setGrid(snap.g);
-    ({ cur, nxt, score, maxV, minE } = snap);
-    nxt2 = snap.nxt2 || rollValue();
-    rescueUsed = !!snap.rescueUsed; freeHammer = !!snap.freeHammer; toolFree = false;
-    oldStart = snap.oldStart || 0;
-    if (typeof snap.inf === 'number') { infCount = snap.inf; store.set(INF_KEY, String(infCount)); }
-    resetShooter();
+    setCoins(coins - lastEarned - price);
+    applyState(snap);
+    freeUses.undo = Math.max(0, freeUndos - (price ? 0 : 1));
+    infCount = snap.inf; store.set(INF_KEY, String(infCount));
     snap = null; lastEarned = 0;
     over = false; tool = null; sel = null; praise = null;
     ghosts = []; floaters = []; flyers = []; bubbles = [];
@@ -810,10 +1109,11 @@
     takeSnap();
     busy = true;
     aim = c;
+    if (lv) { lv.used++; if (lv.shots) lv.shotsLeft--; }
 
     const t = shooter;
     t.x = cellX(c);
-    const full = count(c) === ROWS;
+    const full = count(c) === rows;
     const destY = full ? cellY(r) + cell * 0.6 : cellY(r);
     const dur = 0.13 + 0.032 * Math.max(0, (t.y - destY) / cell);
     t.fly = { y0: t.y, y1: destY, t: 0, dur, land: full ? 0 : 0.26, stretch: 0.2 };
@@ -838,7 +1138,8 @@
     }
     combo += await resolve([[c, r]]);
     rewardCombo(combo);
-    levelCheck();
+    if (mode === 'endless') tierCheck();
+    else lv.bestCombo = Math.max(lv.bestCombo, combo);
     finishTurn();
   }
 
@@ -849,6 +1150,7 @@
     if (!launchable(cur)) { cur = rollValue(); shooter.v = cur; shooter.s = 0.6; }
     if (!launchable(nxt)) nxt = rollValue();
     if (!launchable(nxt2)) nxt2 = rollValue();
+    if (mode === 'level' && levelEnded()) { updateHud(); return; }
     if (isStuck()) gameOver();     // gameOver saves too
     else save();
     updateHud();
@@ -863,8 +1165,8 @@
         if (grid[fc][fr] && eqNeighbors(fc, fr).length) { hit = [fc, fr]; break; }
       }
       if (!hit) {
-        outer: for (let c = 0; c < COLS; c++)
-          for (let r = 0; r < ROWS; r++)
+        outer: for (let c = 0; c < cols; c++)
+          for (let r = 0; r < rows; r++)
             if (grid[c][r] && eqNeighbors(c, r).length) { hit = [c, r]; break outer; }
       }
       if (!hit) return merges;
@@ -879,6 +1181,7 @@
       if (up >= 0) { const above = grid[hc][hr - 1]; ns[up] = [hc, hr]; t = above; }
       const srcs = ns.map(([nc, nr]) => { const o = grid[nc][nr]; grid[nc][nr] = null; return o; });
       merges += ns.length;                       // a 3-way merge counts as 2, a 4-way as 3
+      if (lv) lv.bestMerge = Math.max(lv.bestMerge, ns.length + 1);
       const infPair = t.v >= INF;                // ∞ + ∞: both clear away for a bonus
       await bubbleMerge(t, srcs, t.v * Math.pow(2, ns.length)); // ×2, ×4 or ×8
       const tp = find(t) || [hc, hr];
@@ -896,33 +1199,33 @@
 
   // Reaching a new level only announces it - blocks are never removed. Until the
   // old level's blocks are cleared, the launcher keeps mixing in their values.
-  function levelCheck() {
-    const want = 10 * levelOf(maxV) + 1;   // smallest value of the new level's range
+  function tierCheck() {
+    const want = 10 * tierOf(maxV) + 1;    // smallest value of the new tier's range
     if (want <= minE) return;
     minE = want;
     oldStart = oldBlocks().length;
-    banner = { text: want >= 21 ? 'M level unlocked!' : 'K level unlocked!', life: 2.4 };
+    banner = { text: want >= 21 ? 'M blocks unlocked!' : 'K blocks unlocked!', life: 2.4 };
   }
 
   // Free: trade the current tile with the next one.
+  const helpersOff = () => mode === 'level' && levelDef().noHelpers;
   function swap() {
-    if (busy || over || tool) return;
+    if (busy || over || tool || helpersOff()) return;
     [cur, nxt] = [nxt, cur];
     shooter.v = cur; shooter.s = 0.7; shooter.wob = { amp: 0.15, t: 0 };
     updateHud(); save();
   }
 
   // ---------- paid helpers ----------
-  function toggleTool(name, free = false) {
+  function toggleTool(name) {
     if (busy) return;
     if (tool === name) {
-      tool = null; sel = null; toolFree = false; updateHud();
+      tool = null; sel = null; updateHud();
       if (isStuck()) gameOver();   // backed out of a rescue: still stuck
       return;
     }
-    free = free && name === 'hammer' && freeHammer;
-    if (over || (coins < COST[name] && !free)) return;
-    tool = name; sel = null; toolFree = free;
+    if (over || coins < priceOf(name) || helpersOff()) return;
+    tool = name; sel = null;
     hideOverlay();
     updateHud();
   }
@@ -933,8 +1236,7 @@
     if (!t) return;
     if (tool === 'hammer') {
       takeSnap();
-      if (toolFree) { freeHammer = false; toolFree = false; }
-      else setCoins(coins - COST.hammer);
+      spend('hammer');
       tool = null; busy = true;
       fadeGhost(t, cell * 0.5);
       for (let i = 0; i < 8; i++) {
@@ -956,7 +1258,7 @@
       const o = grid[sc][sr];
       if (o.v === t.v) { sel = [c, r]; updateHud(); return; } // swapping equals does nothing
       takeSnap();
-      setCoins(coins - COST.swap);
+      spend('swap');
       tool = null; sel = null; busy = true;
       grid[sc][sr] = t; grid[c][r] = o;
       t.s = o.s = 1.15;
@@ -971,17 +1273,20 @@
 
   // ---------- game lifecycle ----------
   function newGame() {
-    grid = Array.from({ length: COLS }, () => Array(ROWS).fill(null));
+    mode = 'endless'; lv = null;
+    cols = 5; rows = 7;
+    layout();
+    grid = Array.from({ length: cols }, () => Array(rows).fill(null));
     score = 0; maxV = 2; minE = 1; oldStart = 0; over = false; busy = false;
     ghosts = []; floaters = []; flyers = []; bubbles = []; banner = null; praise = null;
     tool = null; sel = null; snap = null; lastEarned = 0;
     clearCoinFlights();
-    bag = []; bagKey = ''; rescueUsed = false; freeHammer = false; toolFree = false;
+    bag = []; bagKey = ''; rescueUsed = false; freeUses = { hammer: 0, swap: 0, undo: 0 };
     cur = rollValue(); nxt = rollValue(); nxt2 = rollValue();
     gameId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     resetShooter();
     hideOverlay();
-    store.del(SAVE_KEY);
+    store.del(saveKey());
     updateHud();
   }
 
@@ -989,25 +1294,18 @@
   // Undo / the rescue; New game (or Play again) is what clears it.
   function save() {
     store.set(BEST_KEY, String(best));
-    store.set(SAVE_KEY, JSON.stringify({
-      g: gridValues(),
-      cur, nxt, nxt2, score, maxV, minE, snap, lastEarned, gameId, oldStart, rescueUsed, freeHammer,
-    }));
+    store.set(saveKey(), JSON.stringify({ ...captureState(), snap, lastEarned, gameId }));
+    store.set(MODE_KEY, mode);
   }
 
-  function load() {
+  function load(m = mode) {
     try {
-      const d = JSON.parse(store.get(SAVE_KEY) || 'null');
-      if (!d || !Array.isArray(d.g) || d.g.length !== COLS) return false;
-      setGrid(d.g);
-      cur = d.cur; nxt = d.nxt; score = d.score; maxV = d.maxV; minE = d.minE || 1; over = false;
+      const d = JSON.parse(store.get(saveKey(m)) || 'null');
+      if (!d || !Array.isArray(d.g)) return false;
+      applyState(d);
+      over = false;
       snap = d.snap || null; lastEarned = d.lastEarned || 0;
       gameId = d.gameId || Date.now().toString(36);
-      oldStart = d.oldStart || 0;
-      nxt2 = d.nxt2 || rollValue();
-      rescueUsed = !!d.rescueUsed; freeHammer = !!d.freeHammer;
-      minE = Math.min(minE, 10 * levelOf(maxV) + 1);
-      resetShooter();
       compact();
       updateHud();
       return true;
@@ -1064,6 +1362,7 @@
   }
 
   function gameOver() {
+    if (mode === 'level') return levelLost('No room left');
     over = true;
     tool = null; sel = null;
     save();
@@ -1077,11 +1376,11 @@
     }
   }
 
-  function renderGameOver(mode, rank) {
-    const canUndo = snap && coins - lastEarned >= COST.undo;
-    const canHammer = coins >= COST.hammer;
-    const canRescue = (!rescueUsed || freeHammer) && countTiles() > 0;
-    const entry = mode === 'enter' ? `
+  function renderGameOver(view, rank) {
+    const canUndo = snap && coins - lastEarned >= priceOf('undo');
+    const canHammer = freeUses.hammer === 0 && coins >= COST.hammer;
+    const canRescue = mode === 'endless' && (!rescueUsed || freeUses.hammer > 0) && countTiles() > 0;
+    const entry = view === 'enter' ? `
       <div class="newhs">NEW HIGH SCORE — RANK #${rank}!</div>
       <p>Enter your initials</p>
       <input id="initials" class="initials" maxlength="3" autocomplete="off" autocapitalize="characters"
@@ -1097,12 +1396,12 @@
         ${canUndo ? `<button id="goUndo">↶ Undo <span class="coin"></span> ${COST.undo}</button>` : ''}
         ${canHammer ? `<button id="goHammer">🔨 Hammer <span class="coin"></span> ${COST.hammer}</button>` : ''}
       </div>` : ''}
-      <button class="${mode === 'enter' ? '' : 'primary'}" id="againBtn">Play again</button>`);
+      <button class="${view === 'enter' ? '' : 'primary'}" id="againBtn">Play again</button>`);
     $('againBtn').onclick = newGame;
     if (canUndo) $('goUndo').onclick = undo;
     if (canHammer) $('goHammer').onclick = () => { over = false; toggleTool('hammer'); };
-    if (canRescue) $('goRescue').onclick = () => { rescueUsed = true; freeHammer = true; over = false; toggleTool('hammer', true); };
-    if (mode === 'enter') {
+    if (canRescue) $('goRescue').onclick = () => { if (!rescueUsed) { rescueUsed = true; freeUses.hammer++; } over = false; toggleTool('hammer'); };
+    if (view === 'enter') {
       const inp = $('initials'), btn = $('saveScore');
       const sync = () => {
         const v = inp.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
@@ -1136,6 +1435,7 @@
         <li>Merge past 2048M to make an <b>∞ block</b> — the ultimate tile. Each new ∞ pays 500 coins, and two ∞ that touch clear away for 250 more. Your ∞ count is shown at the top.</li>
         <li>Stuck? Once per game you get a free Hammer to dig yourself out.</li>
         <li>Game ends when neither tile can be placed.</li>
+        <li><b>Menu</b> → Levels: 24 levels on growing boards, each with a goal and a shot limit. Earn up to 3 stars per level.</li>
       </ul>
       <div class="row"><button id="boardBtn">🏆 Scoreboard</button><button class="primary" id="closeBtn">Got it</button></div>`);
     $('closeBtn').onclick = hideOverlay;
@@ -1292,8 +1592,8 @@
   function stepTile(t, tx, ty, dt, k, ks) {
     if (t.ty == null) { t.ty = ty; }
     if (Math.abs(ty - t.ty) > 0.5) {
-      const rows = Math.abs(ty - t.y) / cell;
-      t.fly = { y0: t.y, y1: ty, t: 0, dur: 0.09 + 0.05 * rows, land: 0.12, stretch: 0.08 };
+      const dist = Math.abs(ty - t.y) / cell;
+      t.fly = { y0: t.y, y1: ty, t: 0, dur: 0.09 + 0.05 * dist, land: 0.12, stretch: 0.08 };
       t.ty = ty;
     }
     if (t.fly) {
@@ -1344,16 +1644,16 @@
     nowMs = now;
 
     // board background and lanes
-    rr(bx - 6, by - 6, cell * COLS + 12, cell * ROWS + 12, 16);
+    rr(bx - 6, by - 6, cell * cols + 12, cell * rows + 12, 16);
     ctx.fillStyle = '#1b1830';
     ctx.fill();
-    for (let c = 0; c < COLS; c++) {
+    for (let c = 0; c < cols; c++) {
       let off = 0;
       if (shake && shake.c === c) off = Math.sin(shake.t * 60) * 5 * (shake.t / 0.35);
       const n = count(c);
-      ctx.fillStyle = n >= ROWS - 1 ? '#3a2335'
+      ctx.fillStyle = n >= rows - 1 && rows >= 5 ? '#3a2335'   // nearly-full warning on taller boards
         : c === aim && !over && !tool ? '#2d2948' : '#26223d';
-      rr(cellX(c) + 2 + off, by, cell - 4, cell * ROWS, 10);
+      rr(cellX(c) + 2 + off, by, cell - 4, cell * rows, 10);
       ctx.fill();
     }
     if (shake) { shake.t -= dt; if (shake.t <= 0) shake = null; }
@@ -1361,7 +1661,7 @@
     // landing preview: dashed outline where the shot will land
     if (!over && !busy && !tool && shooter) {
       const lr = landingRow(aim, cur);
-      if (lr >= 0 && count(aim) < ROWS) {
+      if (lr >= 0 && count(aim) < rows) {
         ctx.save();
         ctx.setLineDash([cell * 0.09, cell * 0.06]);
         ctx.lineWidth = 2.5;
@@ -1400,8 +1700,8 @@
     for (const f of flyers) { stepTile(f, f.x, f.ty, dt, k, ks); drawT(f); }
 
     // board tiles
-    if (grid) for (let c = 0; c < COLS; c++)
-      for (let r = 0; r < ROWS; r++) {
+    if (grid) for (let c = 0; c < cols; c++)
+      for (let r = 0; r < rows; r++) {
         const t = grid[c][r];
         if (!t) continue;
         stepTile(t, cellX(c), cellY(r), dt, k, ks);
@@ -1438,7 +1738,7 @@
     // launcher: a row of slots with arrows; the tile sits in the aimed slot
     const ly = launchY();
     const sp = cell * 0.035;
-    for (let c = 0; c < COLS; c++) {
+    for (let c = 0; c < cols; c++) {
       const x = cellX(c);
       rr(x + sp, ly + sp, cell - sp * 2, cell - sp * 2, cell * 0.12);
       ctx.fillStyle = '#17142b';
@@ -1462,6 +1762,17 @@
       if (shooter.wob) { shooter.wob.t += dt; if (shooter.wob.t > 1.2) shooter.wob = null; }
       drawT(shooter);
     }
+    // tutorial hand: points at the column to shoot on a level's first move
+    if (mode === 'level' && lv && lv.used === 0 && levelDef().hint !== undefined && !over &&
+        !$('overlay').classList.contains('show')) {
+      const hx = cellX(levelDef().hint) + cell / 2, bob = Math.sin(now / 220) * cell * 0.08;
+      ctx.save();
+      ctx.font = `${cell * 0.55}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('👆', hx + cell * 0.1, ly + cell * 1.15 + bob);
+      ctx.restore();
+    }
 
     // floating score text
     floaters = floaters.filter(f => f.life > 0);
@@ -1483,8 +1794,8 @@
       praise.life -= dt;
       praise.s += (1 - praise.s) * (1 - Math.exp(-dt * 12));
       const a = clamp(praise.life * 2.5, 0, 1);
-      const cx = bx + cell * COLS / 2;
-      const cy = by + cell * ROWS * 0.42;
+      const cx = bx + cell * cols / 2;
+      const cy = by + cell * rows * 0.42;
       const size = Math.min(cell * (0.55 + praise.tier * 0.06), W / (praise.text.length * 0.62));
       ctx.save();
       ctx.globalAlpha = a;
@@ -1528,15 +1839,15 @@
       ctx.save();
       ctx.globalAlpha = a;
       const bh = cell * 0.7;
-      const bY = by + cell * ROWS / 2 - bh / 2;
-      rr(bx + 8, bY, cell * COLS - 16, bh, 12);
+      const bY = by + cell * rows / 2 - bh / 2;
+      rr(bx + 8, bY, cell * cols - 16, bh, 12);
       ctx.fillStyle = 'rgba(255,211,77,0.95)';
       ctx.fill();
       ctx.fillStyle = '#1a1533';
       ctx.font = `800 ${Math.min(cell * 0.26, 18)}px system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(banner.text, bx + cell * COLS / 2, bY + bh / 2);
+      ctx.fillText(banner.text, bx + cell * cols / 2, bY + bh / 2);
       ctx.restore();
       if (banner.life <= 0) banner = null;
     }
@@ -1548,11 +1859,11 @@
   function colAt(clientX) {
     const r = cv.getBoundingClientRect();
     const c = Math.floor((clientX - r.left - bx) / cell);
-    return c >= 0 && c < COLS ? c : -1;
+    return c >= 0 && c < cols ? c : -1;
   }
   function rowAt(clientY) {
     const r = Math.floor((clientY - cv.getBoundingClientRect().top - by) / cell);
-    return r >= 0 && r < ROWS ? r : -1;
+    return r >= 0 && r < rows ? r : -1;
   }
   const aimAt = e => {
     const c = colAt(e.clientX);
@@ -1576,7 +1887,9 @@
     if ($('overlay').classList.contains('show')) {
       if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') {
         e.preventDefault();
-        over ? newGame() : hideOverlay();
+        if (!over) hideOverlay();
+        else if (mode === 'level') startLevel(lv.result === 'won' && lv.n < LEVELS.length ? lv.n + 1 : lv.n);
+        else newGame();
       }
       return;
     }
@@ -1587,20 +1900,21 @@
     if (k === 'h') { toggleTool('hammer'); return; }
     if (tool) return;
     if (k === 'arrowleft' || k === 'a') { if (!busy) aim = Math.max(0, aim - 1); }
-    else if (k === 'arrowright' || k === 'd') { if (!busy) aim = Math.min(COLS - 1, aim + 1); }
+    else if (k === 'arrowright' || k === 'd') { if (!busy) aim = Math.min(cols - 1, aim + 1); }
     else if (k === ' ' || k === 'arrowup' || k === 'enter' || k === 'w') { e.preventDefault(); fire(aim); }
     else if (k === 's' || k === 'arrowdown') { e.preventDefault(); swap(); }
-    else if (k === 'n') newGame();
-    else if (k >= '1' && k <= String(COLS)) fire(+k - 1);
+    else if (k === 'n') mode === 'level' ? startLevel(lv.n) : newGame();
+    else if (k === 'm') showMenu();
+    else if (/^[1-9]$/.test(k) && +k <= cols) fire(+k - 1);
   });
 
   $('swapBtn').onclick = swap;
   $('tSwap').onclick = () => toggleTool('swap');
   $('tHammer').onclick = () => toggleTool('hammer');
   $('tUndo').onclick = undo;
-  $('newBtn').onclick = () => { if (!busy) newGame(); };
+  $('newBtn').onclick = showMenu;
   $('helpBtn').onclick = showHelp;
-  $('bestBox').onclick = showScoreboard;
+  $('bestBox').onclick = () => (mode === 'level' ? showMap() : showScoreboard());
   $('overlay').addEventListener('click', e => { if (e.target.id === 'overlay' && !over) hideOverlay(); });
 
   // Re-measure whenever the play area changes size (rotation, entering full
@@ -1610,7 +1924,7 @@
     if (!layout()) return;
     fitStats();
     if (shooter) { shooter.x = cellX(aim); shooter.y = launchY(); }
-    if (grid) for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) {
+    if (grid) for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
       const t = grid[c][r];
       if (t) { t.x = cellX(c); t.y = t.ty = cellY(r); t.fly = null; }
     }
@@ -1622,9 +1936,14 @@
 
   // ---------- boot ----------
   layout();
-  if (!load()) {
-    newGame();
-    if (!store.get(BEST_KEY)) showHelp();
+  const firstVisit = !store.get(BEST_KEY) && !store.get(PROGRESS_KEY) && !store.get(SAVE_KEY);
+  if (firstVisit) {
+    startLevel(1);                 // new players start with the tutorial levels
+  } else if (!load()) {
+    if (mode === 'level') { mode = 'endless'; if (!load()) newGame(); showMap(); }
+    else newGame();
+  } else if (mode === 'level' && lv && lv.result) {
+    showMap();                     // reopened after a finished level
   } else if (isStuck()) {
     gameOver();
   }
@@ -1637,9 +1956,9 @@
 
   // exposed for automated testing only
   window.__mb = {
-    fire, swap, newGame, undo, toggleTool, useToolAt, comboCoins, rollValue,
+    fire, swap, newGame, undo, toggleTool, useToolAt, comboCoins, rollValue, startLevel, showMap, playEndless, LEVELS,
     setCoins,
-    state: () => ({ grid: gridValues(), cur, nxt, nxt2, score, over, busy, coins, tool, sel, snap: !!snap, maxV, infCount, minE }),
+    state: () => ({ grid: gridValues(), cur, nxt, nxt2, score, over, busy, coins, tool, sel, snap: !!snap, maxV, infCount, minE, mode, lv, cols, rows, freeUses }),
   };
 })();
 </script>

@@ -5,7 +5,7 @@ Build a level mode on the existing engine first, with small boards that grow fro
 | Phase | What | Gate to move on |
 | --- | --- | --- |
 | Now | Endless quick wins: bag randomiser, ∞ pays coins, two-tile preview, free rescue *(done)* | none |
-| 1 | **Level mode MVP**: variable board size, 24 teaching levels, goals + shot limits + 1–3 stars, level map, free helper samples | Bot wins levels 1–6 every time; a new player finishes 1–12 without help |
+| 1 | **Level mode MVP** *(built, now in playtesting)*: variable board size, 24 teaching levels, goals + shot limits + 1–3 stars, level map, free helper samples | Bot wins levels 1–6 every time; a new player finishes 1–12 without help |
 | 2 | Rewards: win-streak ladder, chest every 10 levels, milestone bounties | Players replay levels for 3 stars |
 | 3 | Variety: one new blocker per world, daily challenge, skins as coin sinks | New worlds still feel fresh |
 | 4 | Story: spend stars to restore an illustrated scene, one caption at a time | none |
