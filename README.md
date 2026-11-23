@@ -11,7 +11,7 @@ See [docs/roadmap.md](docs/roadmap.md) for what's next.
 
 ## Play
 
-Live: **https://play-merge-quest.netlify.app** (installable as an app, works offline).
+Live: **https://play-merge-quest.netlify.app** (installable as an app, works offline). Every push to `main` deploys automatically via Netlify.
 
 Open `index.html` in any browser. No build or install needed, and it works offline. When hosted (e.g. on Netlify, configured by `netlify.toml`) it can be installed as an app from the browser's **Add to Home Screen** or **Install app**.
 
