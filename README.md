@@ -11,6 +11,8 @@ See [docs/roadmap.md](docs/roadmap.md) for what's next.
 
 ## Play
 
+Live: **https://play-merge-quest.netlify.app** (installable as an app, works offline).
+
 Open `index.html` in any browser. No build or install needed, and it works offline. When hosted (e.g. on Netlify, configured by `netlify.toml`) it can be installed as an app from the browser's **Add to Home Screen** or **Install app**.
 
 Controls: tap a column (or ← → and Space / keys 1–5) to shoot; S switches the current and next tile; H hammer; U undo; N new game / restart level; M menu.
