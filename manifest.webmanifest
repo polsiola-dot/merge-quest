@@ -1,0 +1,16 @@
+{
+  "name": "Merge Quest",
+  "short_name": "Merge Quest",
+  "description": "Shoot number tiles, chain merges into combos, earn coins.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14112a",
+  "theme_color": "#14112a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

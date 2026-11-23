@@ -1,0 +1,1642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="description" content="Shoot number tiles, chain merges into combos, earn coins. Works offline.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Merge Quest">
+<meta name="theme-color" content="#14112a">
+<title>Merge Quest</title>
+<style>
+  :root {
+    --bg: #14112a;
+    --panel: #221d40;
+    --panel-2: #2c2652;
+    --text: #f3f0ff;
+    --muted: #a49dd0;
+    --accent: #ffd34d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    height: 100dvh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    height: 100dvh;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    gap: 10px;
+  }
+  header { display: flex; gap: 8px; align-items: stretch; }
+  .title {
+    font-weight: 800;
+    font-size: clamp(14px, 4.4vw, 18px);
+    line-height: 1.05;
+    letter-spacing: .02em;
+    display: block;
+    align-self: center;
+    white-space: nowrap;
+    padding-right: 4px;
+  }
+  .title span { color: var(--accent); }
+  .stat {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 6px 10px;
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+  }
+  .stat small {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+  .stat b { font-size: 20px; font-variant-numeric: tabular-nums; display: inline-block; white-space: nowrap; }
+  .stat { overflow: hidden; }
+  #wrap { flex: 1; position: relative; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; }
+  footer { display: flex; gap: 8px; align-items: center; }
+  .next {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border-radius: 12px; padding: 6px 10px;
+    font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase;
+  }
+  #nextTile2 { width: 28px !important; height: 28px !important; opacity: .8; }
+  #nextTile, #nextTile2 {
+    width: 38px; height: 38px; border-radius: 7px;
+    display: grid; place-items: center; padding-bottom: 4px;
+    font: 900 13px "Arial Rounded MT Bold", "Nunito", "Varela Round", "Trebuchet MS", system-ui, sans-serif;
+    color: #fff; letter-spacing: 0;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.18);
+    text-shadow: -1.5px -1.5px 0 #1a1533, 1.5px -1.5px 0 #1a1533, -1.5px 1.5px 0 #1a1533, 1.5px 1.5px 0 #1a1533, 0 2px 0 #1a1533;
+  }
+  button {
+    font: inherit; font-weight: 700; color: var(--text);
+    background: var(--panel-2); border: 0; border-radius: 12px;
+    padding: 12px 14px; cursor: pointer; flex: 1; white-space: nowrap;
+  }
+  button:hover { filter: brightness(1.15); }
+  button:active { transform: scale(.97); }
+  button.primary { background: var(--accent); color: #1a1533; }
+  .hint { text-align: center; font-size: 12px; color: var(--muted); min-height: 16px; }
+  #overlay {
+    position: fixed; inset: 0; display: none;
+    background: rgba(10, 8, 24, .78);
+    align-items: center; justify-content: center; padding: 16px;
+    z-index: 10;
+  }
+  #overlay.show { display: flex; }
+  .card {
+    background: var(--panel); border-radius: 18px; padding: 22px;
+    width: 100%; max-width: 340px; text-align: center;
+    display: flex; flex-direction: column; gap: 12px;
+    max-height: calc(100dvh - 32px); overflow-y: auto;
+  }
+  .newhs { color: var(--accent); font-weight: 800; font-size: 15px; letter-spacing: .04em; }
+  .initials {
+    width: 100%; font: 900 34px "Arial Rounded MT Bold", "Nunito", system-ui, sans-serif;
+    text-align: center; letter-spacing: .5em; text-indent: .5em; text-transform: uppercase;
+    background: #17142b; color: var(--text); border: 2px solid var(--panel-2);
+    border-radius: 12px; padding: 8px 0; outline: none;
+  }
+  .initials:focus { border-color: var(--accent); }
+  .initials { -webkit-user-select: text; user-select: text; touch-action: manipulation; }
+  .card { touch-action: pan-y; }
+  .board-list { list-style: none; padding: 0; margin: 0; text-align: left; font-variant-numeric: tabular-nums; }
+  .board-list li {
+    display: grid; grid-template-columns: 28px 52px 1fr auto; gap: 8px; align-items: center;
+    padding: 6px 10px; border-radius: 10px; font-size: 15px;
+  }
+  .board-list li:nth-child(odd) { background: rgba(255,255,255,.04); }
+  .board-list li.me { background: rgba(255,211,77,.18); outline: 1px solid rgba(255,211,77,.6); }
+  .board-list .rk { color: var(--muted); font-weight: 700; }
+  .board-list .nm { font-weight: 900; letter-spacing: .12em; }
+  .board-list .sc { font-weight: 800; text-align: right; }
+  .board-list .tl { color: var(--muted); font-size: 12px; text-align: right; }
+  .board-empty { color: var(--muted); font-size: 14px; }
+  #bestBox { cursor: pointer; }
+  #infBox { flex: 0 0 auto; min-width: 58px; padding: 6px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  #infBox b { font-size: 15px; color: var(--accent); }
+  #infBox b::before { content: '×'; font-size: 12px; opacity: .8; margin-right: 1px; }
+  .infIcon {
+    width: 30px; height: 24px; border-radius: 6px; display: grid; place-items: center;
+    font: 900 20px/1 system-ui, sans-serif; color: #fde68a; text-shadow: 0 1px 0 #3b1d02;
+    background: linear-gradient(160deg, #2a1745, #140f24);
+    box-shadow: 0 0 0 2px #f472b6, 0 0 0 3px #22d3ee, 0 0 10px rgba(167,139,250,.6);
+  }
+  #infBox.pop { animation: infPop .7s ease-out; }
+  @keyframes infPop { 30% { transform: scale(1.25); } to { transform: scale(1); } }
+  .card h2 { font-size: 26px; }
+  .card p { color: var(--muted); font-size: 14px; line-height: 1.45; }
+  .card .big { font-size: 40px; font-weight: 800; color: var(--accent); }
+  .card ul { text-align: left; color: var(--muted); font-size: 14px; line-height: 1.5; padding-left: 18px; }
+  .card .row { display: flex; gap: 8px; }
+  .card .row button { padding: 10px 6px; font-size: 15px; min-width: 0; }
+  .coin {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff3b0, #ffc93c 55%, #d99a12);
+    box-shadow: inset 0 0 0 1.5px #b07a08; vertical-align: -2px;
+  }
+  .tools { display: flex; gap: 8px; align-items: stretch; }
+  .wallet {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--panel); border-radius: 12px; padding: 0 12px;
+    font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums;
+    min-width: 86px; justify-content: center; transition: transform .15s;
+  }
+  .wallet.bump { transform: scale(1.15); }
+  .wallet { position: relative; }
+  #coinLayer { position: fixed; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+  .fcoin {
+    position: absolute; left: 0; top: 0; width: 24px; height: 24px; margin: -12px 0 0 -12px;
+    border-radius: 50%; will-change: transform;
+    background: radial-gradient(circle at 35% 30%, #fff6c4, #ffd047 45%, #e0a015 80%, #b07a08);
+    box-shadow: inset 0 0 0 2px rgba(176,122,8,.9), inset 0 0 0 5px rgba(255,236,150,.55), 0 2px 6px rgba(0,0,0,.35);
+  }
+  .fcoin::after {
+    content: ''; position: absolute; inset: 7px; border-radius: 50%;
+    border: 2px solid rgba(176,122,8,.55);
+  }
+  .coin-plus {
+    position: absolute; left: 50%; top: -6px; transform: translate(-50%, 0);
+    color: var(--accent); font-weight: 900; font-size: 16px; white-space: nowrap;
+    text-shadow: 0 2px 0 #1a1533, 0 0 8px rgba(255,211,77,.6);
+    animation: coinPlus 1s ease-out forwards; pointer-events: none;
+  }
+  @keyframes coinPlus { from { opacity: 0; transform: translate(-50%, 6px) scale(.7); }
+    20% { opacity: 1; transform: translate(-50%, -8px) scale(1.15); }
+    to { opacity: 0; transform: translate(-50%, -30px) scale(1); } }
+  .sparkle {
+    position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
+    background: #fff3b0; box-shadow: 0 0 6px #ffd34d; pointer-events: none;
+  }
+  .wallet .coin { width: 18px; height: 18px; }
+  .tool { padding: 7px 6px; line-height: 1.15; }
+  .tool .ic { font-size: 18px; display: block; }
+  .tool .nm { font-size: 12px; display: block; }
+  .tool .pr { font-size: 11px; color: var(--accent); display: block; }
+  .tool.active { background: var(--accent); color: #1a1533; }
+  .tool.active .pr { color: #1a1533; }
+  .tool:disabled { opacity: .4; cursor: not-allowed; filter: none; transform: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title">MERGE<br><span>QUEST</span></div>
+    <div class="stat"><small>Score</small><b id="score">0</b></div>
+    <div class="stat" id="bestBox" title="Scoreboard"><small>Best 🏆</small><b id="best">0</b></div>
+    <div class="stat" id="infBox" title="∞ blocks collected"><span class="infIcon">∞</span><b id="infCount">0</b></div>
+  </header>
+  <div id="wrap"><canvas id="c"></canvas></div>
+  <div class="hint" id="hint">Tap a column to shoot. Matching numbers merge.</div>
+  <div class="tools">
+    <div class="wallet" id="wallet" title="Coins: earned from combos"><span class="coin"></span><span id="coins">0</span></div>
+    <button class="tool" id="tSwap" title="Swap any two blocks on the board"><span class="ic">⇄</span><span class="nm">Swap</span><span class="pr">200</span></button>
+    <button class="tool" id="tHammer" title="Smash any block (H)"><span class="ic">🔨</span><span class="nm">Hammer</span><span class="pr">250</span></button>
+    <button class="tool" id="tUndo" title="Undo the last play (U / Ctrl+Z)"><span class="ic">↶</span><span class="nm">Undo</span><span class="pr">25</span></button>
+  </div>
+  <footer>
+    <div class="next">Next <div id="nextTile"></div><div id="nextTile2" title="After that"></div></div>
+    <button id="swapBtn" title="Switch current and next tile (S) — free">⇅ Switch</button>
+    <button id="helpBtn" title="How to play">?</button>
+    <button id="newBtn" title="New game (N)">New</button>
+  </footer>
+</div>
+
+<div id="coinLayer"></div>
+<div id="overlay">
+  <div class="card" id="card"></div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const COLS = 5, ROWS = 7;
+  const SAVE_KEY = 'mergeQuest.save.v1';
+  const BEST_KEY = 'mergeQuest.best.v1';
+  const COIN_KEY = 'mergeQuest.coins.v1';
+  const BOARD_KEY = 'mergeQuest.scoreboard.v1';
+  const INITIALS_KEY = 'mergeQuest.initials.v1';
+  const BOARD_SIZE = 10;
+  const START_COINS = 50;
+  const COST = { swap: 200, hammer: 250, undo: 25 };
+  // combo = merges set off by one play (chain reactions included).
+  // [min combo, praise, coins, colour]
+  const PRAISE = [
+    [2, 'Nice!',        3,   '#6cc8ff'],
+    [3, 'Great!',       8,   '#4fe0b0'],
+    [4, 'Excellent!',   15,  '#a7e35c'],
+    [5, 'Amazing!',     25,  '#ffd34d'],
+    [6, 'Incredible!',  40,  '#ffa04a'],
+    [7, 'Unstoppable!', 60,  '#ff6f6f'],
+    [8, 'Legendary!',   90,  '#ff62a8'],
+    [10, 'GODLIKE!!',   150, '#c983ff'],
+  ];
+  // Each level ("tier") has its own look; higher tiers are more premium.
+  // Tier 0: 2 … 2048 · Tier 1: 4K … 2048K · Tier 2: 4M … 2048M · then ∞.
+  const PALETTE = [   // level 1 colours: soft, muted (higher levels derive from these)
+    '#7d8bd6', '#3fa39a', '#d0875e', '#9170c4', '#57a062', '#d06a92',
+    '#4c80c6', '#c9a243', '#b8585d', '#46a9c4', '#dd6079'
+  ];
+  const INF = 4294967296;   // 2^32: anything past 2048M becomes ∞
+  const INF_KEY = 'mergeQuest.infinity.v1';
+  const FONT = '"Arial Rounded MT Bold", "Nunito", "Varela Round", "Trebuchet MS", system-ui, sans-serif';
+  const PAIR_MS = 220;    // suck-in time when just two blocks merge
+  const MERGE_MS = 280;   // suck-in time per block when 3+ blocks merge
+  const STAGGER_MS = 100; // delay before each extra block starts (multi-merges)
+  // mix a #rrggbb colour toward white (f > 0) or black (f < 0)
+  const shadeCache = new Map();
+  function shade(hex, f) {
+    const key = hex + f;
+    if (shadeCache.has(key)) return shadeCache.get(key);
+    const n = parseInt(hex.slice(1), 16);
+    const t = f < 0 ? 0 : 255, a = Math.abs(f);
+    const ch = sh => Math.round(((n >> sh) & 255) + (t - ((n >> sh) & 255)) * a);
+    const out = `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+    shadeCache.set(key, out);
+    return out;
+  }
+
+  const $ = id => document.getElementById(id);
+  const cv = $('c'), ctx = cv.getContext('2d');
+  const wrap = $('wrap');
+
+  // ---------- storage (never trusted to exist) ----------
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+  };
+
+  // ---------- state ----------
+  let grid, cur, nxt, nxt2, shooter, score, best, maxV, minE, over;
+  let bag = [], bagKey = '';          // shuffled launch bag (fairer than pure random)
+  let rescueUsed = false, freeHammer = false;  // one free Hammer per game when stuck
+  let toolFree = false;               // the Hammer now armed is the free rescue one
+  let aim = 2, busy = false;
+  let ghosts = [], floaters = [], banner = null, shake = null, praise = null;
+  let flyers = [], bubbles = [];  // shots heading for a full column; merge bubbles
+  let tool = null, sel = null;      // active helper ('swap' | 'hammer') and first swap pick
+  let snap = null, lastEarned = 0;  // undo snapshot and coins earned by that play
+  let gameId = '';
+  let coinFlights = [], coinPending = 0;
+  let oldStart = 0;                 // old-level blocks on the board when the level began
+  let infCount = parseInt(store.get(INF_KEY) || '0', 10) || 0;  // ∞ blocks ever made  // coins flying to the wallet, not yet shown                  // identifies this game's scoreboard entry
+  best = parseInt(store.get(BEST_KEY) || '0', 10) || 0;
+  let coins = parseInt(store.get(COIN_KEY) ?? String(START_COINS), 10);
+  if (!Number.isFinite(coins) || coins < 0) coins = START_COINS;
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const log2 = v => Math.round(Math.log2(v));
+  // tier of a value: 0 = 2…2048, 1 = 4K…2048K, 2 = 4M…2048M, 3 = ∞
+  const tierOfE = e => e >= 32 ? 3 : e >= 22 ? 2 : e >= 12 ? 1 : 0;
+  // ---- higher levels reuse the muted base hues, a bit brighter each level
+  function hexToHsl(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+    let h = 0, s = 0;
+    if (mx !== mn) {
+      const d = mx - mn;
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h *= 60;
+    }
+    return [h, s * 100, l * 100];
+  }
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const hsl = (h, s, l) => `hsl(${((h % 360) + 360) % 360},${clamp(s, 0, 100)}%,${clamp(l, 0, 100)}%)`;
+  // base hue for a K/M value: same muted family as level 1, offset so neighbours differ
+  const baseHsl = (e, t) => hexToHsl(PALETTE[(e - (t === 1 ? 12 : 22) + (t === 1 ? 3 : 6)) % PALETTE.length]);
+  function colorOf(v) {
+    const e = log2(v), t = tierOfE(e);
+    if (t === 0) return PALETTE[(e - 1) % PALETTE.length];
+    if (t === 3) return '#8b5cf6';
+    const [h, s, l] = baseHsl(e, t);
+    return hsl(h, s + 14 * t, l + 7 * (t === 2 ? 1.4 : 1));
+  }
+
+  // Short score for the header: full number up to 99,999, then 123K / 1.21M / 4.5B.
+  function shortScore(n) {
+    if (n < 100000) return n.toLocaleString();
+    const units = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
+    for (const [d, u] of units) if (n >= d) {
+      const x = n / d;
+      const txt = x >= 100 ? Math.floor(x).toString() : x >= 10 ? (Math.floor(x * 10) / 10).toString() : (Math.floor(x * 100) / 100).toString();
+      return txt + u;
+    }
+    return String(n);
+  }
+
+  // Tile labels: up to 2048 in full, then 4K, 8K … 512K, 1M … 512M, 1B …
+  function fmt(v) {
+    if (v >= INF) return '∞';
+    if (v >= 4194304) return (v / 1048576) + 'M';   // 4M … 2048M
+    if (v >= 4096) return (v / 1024) + 'K';         // 4K … 2048K
+    return String(v);
+  }
+
+  function newTile(v, x, y) { return { v, x, y, s: 0.2, ty: null }; }
+
+  // ---------- layout ----------
+  let W = 0, H = 0, dpr = 1, cell = 40, bx = 0, by = 0;
+  function layout() {
+    const r = wrap.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cell = Math.floor(Math.min(W / COLS, H / (ROWS + 1.35)));
+    bx = (W - cell * COLS) / 2;
+    by = Math.max(0, (H - cell * (ROWS + 1.35)) / 2);
+  }
+  const cellX = c => bx + c * cell;
+  const cellY = r => by + r * cell;
+  const launchY = () => by + ROWS * cell + cell * 0.3;
+
+  // ---------- board helpers ----------
+  const count = c => grid[c].filter(Boolean).length;
+
+  function landingRow(c, v) {
+    const n = count(c);
+    if (n < ROWS) return n;
+    if (grid[c][ROWS - 1].v === v) return ROWS - 1; // merges into bottom tile
+    return -1;
+  }
+  const fits = v => grid.some((_, c) => landingRow(c, v) >= 0);
+
+  function eqNeighbors(c, r) {
+    const t = grid[c][r];
+    if (!t) return [];
+    const out = [];
+    for (const [dc, dr] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+      const nc = c + dc, nr = r + dr;
+      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+      const o = grid[nc][nr];
+      if (o && o.v === t.v) out.push([nc, nr]);
+    }
+    return out;
+  }
+
+  // Pushes every column's tiles up to the ceiling. Returns positions of tiles that moved.
+  function compact() {
+    const moved = [];
+    for (let c = 0; c < COLS; c++) {
+      const col = grid[c].filter(Boolean);
+      for (let r = 0; r < ROWS; r++) {
+        const t = col[r] || null;
+        if (t && grid[c][r] !== t) moved.push([c, r]);
+        grid[c][r] = t;
+      }
+    }
+    return moved;
+  }
+
+  function find(t) {
+    for (let c = 0; c < COLS; c++)
+      for (let r = 0; r < ROWS; r++)
+        if (grid[c][r] === t) return [c, r];
+    return null;
+  }
+
+  // ---------- tile supply ----------
+  // Current level from the biggest tile made: 0 until 4K, 1 until 4M, then 2.
+  const levelOf = mv => Math.min(2, tierOfE(log2(mv)));
+  // Each level launches the previous level's 2048 plus 4…64 of its own units
+  // (2…64, then 2048/4K…64K, then 2048K/4M…64M). The top of the range opens up
+  // as your biggest tile grows; bigger values are rarer.
+  function boardMaxE() {
+    let m = 0;
+    if (grid) for (const col of grid) for (const t of col) if (t && t.v < INF) m = Math.max(m, log2(t.v));
+    return m;
+  }
+  function spawnRange() {
+    const k = levelOf(maxV), lo = 10 * k + 1;
+    if (k === 0) return [lo, Math.min(lo + 5, Math.max(lo + 2, log2(maxV) - 1))];
+    // K and M levels: never launch anything bigger than the biggest block on the board
+    return [lo, Math.min(lo + 5, Math.max(lo, boardMaxE()))];
+  }
+  // Blocks left over from earlier levels (below this level's launch range).
+  function oldBlocks() {
+    const cut = Math.pow(2, spawnRange()[0]), out = [];
+    if (grid) for (const col of grid) for (const t of col) if (t && t.v < cut) out.push(t.v);
+    return out;
+  }
+
+  function rollValue() {
+    const [lo, hi] = spawnRange();
+    // While old-level blocks remain, often launch one of their values (more
+    // likely for values you have several of): ~70% at first, easing to ~30%
+    // as they get cleared. Only values actually on the board are used.
+    const old = oldBlocks();
+    if (old.length) {
+      if (!oldStart || oldStart < old.length) oldStart = old.length;
+      const pOld = 0.3 + 0.4 * (old.length / oldStart);
+      if (Math.random() < pOld) return old[Math.floor(Math.random() * old.length)];
+    }
+    return drawFromBag(lo, hi);
+  }
+
+  // Is v still a legal launch? (used when a previewed tile moves up the queue)
+  function launchable(v) {
+    const [lo, hi] = spawnRange();
+    if (v >= Math.pow(2, lo) && v <= Math.pow(2, hi)) return true;
+    return oldBlocks().includes(v);
+  }
+
+  // Launches come from a shuffled bag of ~40 tiles built from the odds (each
+  // step up 0.6x as likely), like Threes: no long floods or droughts of one value.
+  // One bag serves the whole level; values currently above the cap (biggest
+  // block on the board) stay in the bag for later instead of being drawn.
+  function drawFromBag(lo, hi) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (bagKey !== String(lo) || !bag.length) {
+        bagKey = String(lo); bag = [];
+        let total = 0;
+        for (let e = lo; e <= lo + 5; e++) total += Math.pow(0.6, e - lo);
+        for (let e = lo; e <= lo + 5; e++) {
+          const n = Math.max(1, Math.round(Math.pow(0.6, e - lo) / total * 40));
+          for (let k = 0; k < n; k++) bag.push(Math.pow(2, e));
+        }
+        for (let i = bag.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [bag[i], bag[j]] = [bag[j], bag[i]];
+        }
+      }
+      const cap = Math.pow(2, hi);
+      for (let i = bag.length - 1; i >= 0; i--) {
+        if (bag.at(i) <= cap) return bag.splice(i, 1)[0];
+      }
+      bag = [];                          // only too-big values left: start a fresh bag
+    }
+    return Math.pow(2, lo);
+  }
+
+  // ---------- scoring / feedback ----------
+  function addScore(v, c, r) {
+    score += v;
+    if (v > maxV) maxV = v;
+    if (score > best) { best = score; store.set(BEST_KEY, String(best)); }
+    floaters.push({ text: '+' + fmt(v), x: cellX(c) + cell / 2, y: cellY(r) + cell / 2, life: 1 });
+    updateHud();
+  }
+
+  function setCoins(n) {
+    coins = Math.max(0, n);
+    store.set(COIN_KEY, String(coins));
+    updateHud();
+  }
+
+  function tierFor(combo) {
+    let t = null;
+    for (const p of PRAISE) if (combo >= p[0]) t = p;
+    return t;
+  }
+  // Coins for a combo. Above the top tier each extra merge adds 25.
+  function comboCoins(combo) {
+    const t = tierFor(combo);
+    if (!t) return 0;
+    const top = PRAISE[PRAISE.length - 1];
+    return t[2] + (combo > top[0] ? (combo - top[0]) * 25 : 0);
+  }
+
+  function rewardCombo(combo) {
+    const t = tierFor(combo);
+    if (!t) return;
+    const gain = comboCoins(combo);
+    lastEarned += gain;
+    setCoins(coins + gain);
+    praise = { text: t[1], sub: combo + '× combo  +' + gain, color: t[3], life: 1.6, s: 0.4, tier: PRAISE.indexOf(t) };
+    launchCoins(gain);
+  }
+
+  // ---------- flying coins ----------
+  // A burst of coins pops out where the praise shows, then each one arcs into the
+  // wallet; the counter ticks up as they land. More coins earned = more coins flying.
+  function launchCoins(gain) {
+    const n = Math.min(12, Math.max(1, Math.ceil(gain / 3)));
+    const cr = cv.getBoundingClientRect();
+    const sx = cr.left + bx + cell * COLS / 2, sy = cr.top + by + cell * ROWS * 0.42 + cell * 0.6;
+    const per = Math.floor(gain / n);
+    let rest = gain - per * n;
+    coinPending += gain;
+    updateHud();
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('div');
+      el.className = 'fcoin';
+      $('coinLayer').appendChild(el);
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
+      const burst = cell * (0.5 + Math.random() * 0.9);
+      coinFlights.push({
+        el, value: per + (rest-- > 0 ? 1 : 0), first: i === 0, last: i === n - 1, gain,
+        sx, sy, bxp: sx + Math.cos(ang) * burst, byp: sy + Math.sin(ang) * burst,
+        start: t0 + 260 + i * 70, popDur: 260, flyDur: 560 + Math.random() * 120, spin: 6 + Math.random() * 6,
+      });
+    }
+  }
+
+  function walletTarget() {
+    const r = $('wallet').querySelector('.coin').getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  }
+
+  function coinLanded(f) {
+    coinPending = Math.max(0, coinPending - f.value);
+    updateHud();
+    const w = $('wallet');
+    w.classList.remove('bump'); void w.offsetWidth; w.classList.add('bump');
+    setTimeout(() => w.classList.remove('bump'), 120);
+    if (f.first) {
+      const plus = document.createElement('div');
+      plus.className = 'coin-plus';
+      plus.textContent = '+' + f.gain;
+      w.appendChild(plus);
+      setTimeout(() => plus.remove(), 1000);
+    }
+    const [tx, ty] = walletTarget();
+    for (let k = 0; k < 3; k++) {
+      const sp = document.createElement('div');
+      sp.className = 'sparkle';
+      $('coinLayer').appendChild(sp);
+      const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 14;
+      sp.animate([
+        { transform: `translate(${tx}px, ${ty}px) scale(1)`, opacity: 1 },
+        { transform: `translate(${tx + Math.cos(a) * d}px, ${ty + Math.sin(a) * d}px) scale(.2)`, opacity: 0 },
+      ], { duration: 380, easing: 'ease-out' }).onfinish = () => sp.remove();
+    }
+  }
+
+  function stepCoins(now) {
+    if (!coinFlights.length) return;
+    const [tx, ty] = walletTarget();
+    coinFlights = coinFlights.filter(f => {
+      const t = now - f.start;
+      let x, y, sc = 1;
+      if (t < 0) { f.el.style.opacity = 0; return true; }
+      f.el.style.opacity = 1;
+      if (t < f.popDur) {                               // pop out of the praise
+        const p = t / f.popDur, e = 1 - Math.pow(1 - p, 3);
+        x = f.sx + (f.bxp - f.sx) * e; y = f.sy + (f.byp - f.sy) * e;
+        sc = 0.3 + 0.9 * e;
+      } else {                                          // arc into the wallet
+        const p = Math.min(1, (t - f.popDur) / f.flyDur);
+        const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        const cx = (f.bxp + tx) / 2 + (f.bxp < tx ? -1 : 1) * cell * 0.8, cy = Math.min(f.byp, ty) - cell * 0.6;
+        const u = 1 - e;
+        x = u * u * f.bxp + 2 * u * e * cx + e * e * tx;
+        y = u * u * f.byp + 2 * u * e * cy + e * e * ty;
+        sc = 1.2 - 0.45 * e;
+        if (p >= 1) { f.el.remove(); coinLanded(f); return false; }
+      }
+      const flip = Math.abs(Math.cos(t / 1000 * f.spin));  // spinning coin
+      f.el.style.transform = `translate(${x}px, ${y}px) scale(${sc * (0.35 + 0.65 * flip)}, ${sc})`;
+      return true;
+    });
+  }
+
+  function clearCoinFlights() {
+    for (const f of coinFlights) f.el.remove();
+    coinFlights = []; coinPending = 0;
+  }
+
+  // Shrink the score/best numbers so big scores always fit their boxes.
+  function fitStats() {
+    for (const id of ['score', 'best']) {
+      const el = $(id), box = el.parentElement;
+      el.style.fontSize = '';
+      let fs = parseFloat(getComputedStyle(el).fontSize);
+      const room = box.clientWidth - 12;
+      while (el.scrollWidth > room && fs > 10) { fs -= 1; el.style.fontSize = fs + 'px'; }
+    }
+  }
+
+  // the small "Next" preview tiles in the footer
+  function paintMini(el, v, sizes) {
+    const label = fmt(v), ts = tileCss(v);
+    el.textContent = label;
+    el.style.fontSize = sizes[Math.min(5, label.length)] + 'px';
+    el.style.background = ts.bg; el.style.color = ts.fg; el.style.border = ts.border;
+  }
+
+  function updateHud() {
+    $('score').textContent = shortScore(score);
+    $('best').textContent = shortScore(best);
+    fitStats();
+    $('coins').textContent = Math.max(0, coins - coinPending).toLocaleString();
+    $('infCount').textContent = infCount.toLocaleString();
+    paintMini($('nextTile'), nxt, [0, 15, 15, 14, 12, 10]);
+    paintMini($('nextTile2'), nxt2, [0, 12, 12, 11, 9, 8]);
+    const idle = !busy;
+    $('tSwap').disabled = !idle || over || (coins < COST.swap && tool !== 'swap') || countTiles() < 2;
+    $('tHammer').disabled = !idle || over || (coins < COST.hammer && tool !== 'hammer') || countTiles() < 1;
+    $('tUndo').disabled = !idle || !snap || coins - lastEarned < COST.undo;
+    $('tSwap').classList.toggle('active', tool === 'swap');
+    $('tHammer').classList.toggle('active', tool === 'hammer');
+    const fitsCur = fits(cur);
+    $('hint').textContent = tool === 'hammer' ? 'Tap a block to smash it (tap Hammer again to cancel).'
+      : tool === 'swap' ? (sel ? 'Now tap the block to swap it with.' : 'Tap the first block to swap.')
+      : over ? 'No moves left.'
+      : !fitsCur ? 'Current tile has nowhere to go — switch it!'
+      : 'Tap a column to shoot. Combos earn coins!';
+  }
+
+  function countTiles() {
+    let n = 0;
+    if (grid) for (const col of grid) for (const t of col) if (t) n++;
+    return n;
+  }
+
+  // A tile being sucked into `target` like one bubble joining another.
+  // `delay` (ms) holds the block in place before it starts moving.
+  function absorbGhost(t, target, delay = 0, dur = MERGE_MS) {
+    ghosts.push({ kind: 'absorb', v: t.v, x0: t.x, y0: t.y, x: t.x, y: t.y, target, t: -delay / 1000, dur: dur / 1000 });
+  }
+  function fadeGhost(t, dy) {
+    ghosts.push({ kind: 'fade', v: t.v, x: t.x, y: t.y, tx: t.x, ty: t.y + dy, a: 1 });
+  }
+
+  // Merge `sources` into `target` with the bubble animation, then pop to newV.
+  // Blocks are sucked in one after another; the number doubles as each lands.
+  async function bubbleMerge(target, sources, newV) {
+    const old = target.v;
+    newV = Math.min(newV, INF);
+    const dur = sources.length === 1 ? PAIR_MS : MERGE_MS;
+    // Plan when each block lands. 2-3 blocks: steady rhythm. 4+ blocks: it
+    // ramps up - each block is sucked in faster and the gaps keep shrinking.
+    const ramp = sources.length >= 3;
+    const plan = [];
+    for (let i = 0; i < sources.length; i++) {
+      if (!ramp) { plan.push({ start: i * STAGGER_MS, dur }); continue; }
+      const d = dur * Math.pow(0.85, i);
+      const arrive = i === 0 ? dur : plan[i - 1].start + plan[i - 1].dur + 110 * Math.pow(0.7, i - 1);
+      plan.push({ start: arrive - d, dur: d });
+    }
+    sources.forEach((src, i) => absorbGhost(src, target, plan[i].start, plan[i].dur));
+    target.show = old;                 // keep showing the old number until absorbed
+    target.v = newV;
+    target.wob = { amp: -0.08, t: 0 }; // slight inhale while it pulls the others in
+    const total = plan[plan.length - 1].start + plan[plan.length - 1].dur;
+    target.mt = { t: 0, dur: (total + 180) / 1000 };
+    let elapsed = 0;
+    for (let i = 0; i < sources.length; i++) {
+      const arrive = plan[i].start + plan[i].dur;
+      await sleep(arrive - elapsed);
+      elapsed = arrive;
+      if (i < sources.length - 1) {    // intermediate step: count up with a small gulp
+        target.show = Math.min(INF, old * Math.pow(2, i + 1));
+        target.s = 1.1 + (ramp ? i * 0.03 : 0);
+        target.wob = { amp: 0.08, t: 0 };
+      }
+    }
+    target.show = undefined;
+    target.s = 1.24;
+    target.wob = { amp: 0.16, t: 0 };
+    if (newV >= INF && old < INF) infinityMade(target);
+    const col = colorOf(newV);
+    const cx = target.x + cell / 2, cy = target.y + cell / 2;
+    for (let i = 0; i < 9; i++) {
+      const a = Math.random() * Math.PI * 2, sp = cell * (1 + Math.random() * 1.6);
+      bubbles.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        r: cell * (0.04 + Math.random() * 0.08), life: 0.5 + Math.random() * 0.35, col });
+    }
+  }
+
+  // A brand-new ∞ block: count it (saved across games) and celebrate.
+  function infinityMade(t) {
+    infCount++;
+    store.set(INF_KEY, String(infCount));
+    banner = { text: '∞ INFINITY BLOCK! #' + infCount, life: 2.4 };
+    const cx = t.x + cell / 2, cy = t.y + cell / 2;
+    const cols = ['#facc15', '#f472b6', '#22d3ee', '#a78bfa', '#ffffff'];
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * Math.PI * 2, sp = cell * (1.5 + Math.random() * 2.5);
+      bubbles.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        r: cell * (0.05 + Math.random() * 0.1), life: 0.8 + Math.random() * 0.5, col: cols[i % cols.length] });
+    }
+    lastEarned += 500;                 // a new ∞ pays 500 coins
+    setCoins(coins + 500);
+    launchCoins(500);
+    const box = $('infBox');
+    box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
+    updateHud();
+  }
+
+  // Two ∞ blocks that merge disappear, opening space, and pay 250 coins.
+  function clearInfinity(t, [c, r]) {
+    if (grid[c][r] !== t) return;
+    grid[c][r] = null;
+    fadeGhost(t, -cell * 0.3);
+    const cx = t.x + cell / 2, cy = t.y + cell / 2;
+    for (let i = 0; i < 18; i++) {
+      const a = Math.random() * Math.PI * 2, sp = cell * (1.2 + Math.random() * 2);
+      bubbles.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        r: cell * (0.05 + Math.random() * 0.08), life: 0.7 + Math.random() * 0.4, col: '#facc15' });
+    }
+    lastEarned += 250;
+    setCoins(coins + 250);
+    launchCoins(250);
+    banner = { text: '∞ + ∞ cleared! +250 coins', life: 2 };
+  }
+
+  // ---------- undo snapshots ----------
+  function takeSnap() {
+    snap = { g: grid.map(col => col.map(t => (t ? t.v : 0))), cur, nxt, nxt2, score, maxV, minE, inf: infCount, oldStart, rescueUsed, freeHammer };
+    lastEarned = 0;
+  }
+
+  function setGrid(g) {
+    grid = g.map((col, c) => col.map((v, r) => (v ? { v, x: cellX(c), y: cellY(r), s: 1, ty: cellY(r) } : null)));
+  }
+
+  function undo() {
+    if (busy || !snap) return;
+    // coins earned by the undone play are taken back, so undo can't be farmed
+    if (coins - lastEarned < COST.undo) return;
+    clearCoinFlights();
+    setCoins(coins - lastEarned - COST.undo);
+    setGrid(snap.g);
+    ({ cur, nxt, score, maxV, minE } = snap);
+    nxt2 = snap.nxt2 || rollValue();
+    rescueUsed = !!snap.rescueUsed; freeHammer = !!snap.freeHammer; toolFree = false;
+    oldStart = snap.oldStart || 0;
+    if (typeof snap.inf === 'number') { infCount = snap.inf; store.set(INF_KEY, String(infCount)); }
+    shooter = newTile(cur, cellX(aim), launchY());
+    snap = null; lastEarned = 0;
+    over = false; tool = null; sel = null; praise = null;
+    ghosts = []; floaters = []; flyers = []; bubbles = [];
+    hideOverlay();
+    banner = { text: 'Undone!', life: 0.9 };
+    save();
+    updateHud();
+    if (!fits(cur) && !fits(nxt)) gameOver();   // undid back into a stuck board
+  }
+
+  // ---------- core turn ----------
+  async function fire(c) {
+    if (busy || over || tool) return;
+    const v = cur;
+    const r = landingRow(c, v);
+    if (r < 0) { shake = { c, t: 0.35 }; return; }
+    takeSnap();
+    busy = true;
+    aim = c;
+
+    const t = shooter;
+    t.x = cellX(c);
+    const full = count(c) === ROWS;
+    const destY = full ? cellY(r) + cell * 0.6 : cellY(r);
+    const dur = 0.13 + 0.032 * Math.max(0, (t.y - destY) / cell);
+    t.fly = { y0: t.y, y1: destY, t: 0, dur, land: full ? 0 : 0.26, stretch: 0.2 };
+    t.ty = destY;
+    if (!full) grid[c][r] = t;
+    else flyers.push(t);
+
+    cur = nxt;
+    nxt = nxt2;
+    nxt2 = rollValue();
+    shooter = newTile(cur, cellX(aim), launchY());
+    updateHud();
+
+    await sleep(dur * 1000 + (full ? 0 : 60));
+    let combo = 0;
+    if (full) {
+      flyers = flyers.filter(f => f !== t);
+      const target = grid[c][r];
+      await bubbleMerge(target, [t], target.v * 2);
+      addScore(target.v, c, r);
+      combo = 1;
+    }
+    combo += await resolve([[c, r]]);
+    rewardCombo(combo);
+    await levelCheck();
+    finishTurn();
+  }
+
+  function finishTurn() {
+    busy = false;
+    // the board has settled: re-check previewed tiles (e.g. a value whose only
+    // match was just merged away, or that now exceeds the biggest block)
+    if (!launchable(cur)) { cur = rollValue(); shooter.v = cur; shooter.s = 0.6; }
+    if (!launchable(nxt)) nxt = rollValue();
+    if (!launchable(nxt2)) nxt2 = rollValue();
+    if (!fits(cur) && !fits(nxt)) gameOver();
+    save();
+    updateHud();
+  }
+
+  // Runs merges until the board is stable. Returns how many merges happened.
+  async function resolve(focus) {
+    let merges = 0;
+    for (let guard = 0; guard < 200; guard++) {
+      let hit = null;
+      for (const [fc, fr] of focus) {
+        if (grid[fc][fr] && eqNeighbors(fc, fr).length) { hit = [fc, fr]; break; }
+      }
+      if (!hit) {
+        outer: for (let c = 0; c < COLS; c++)
+          for (let r = 0; r < ROWS; r++)
+            if (grid[c][r] && eqNeighbors(c, r).length) { hit = [c, r]; break outer; }
+      }
+      if (!hit) return merges;
+
+      const [hc, hr] = hit;
+      const ns = eqNeighbors(hc, hr);
+      // Merge into the block above when there is one: after the column settles the
+      // result lands in the same cell either way, but visually the lower bubble
+      // rises into the upper one instead of the upper being dragged down.
+      let t = grid[hc][hr];
+      const up = ns.findIndex(([nc, nr]) => nc === hc && nr === hr - 1);
+      if (up >= 0) { const above = grid[hc][hr - 1]; ns[up] = [hc, hr]; t = above; }
+      const srcs = ns.map(([nc, nr]) => { const o = grid[nc][nr]; grid[nc][nr] = null; return o; });
+      merges += ns.length;                       // a 3-way merge counts as 2, a 4-way as 3
+      const infPair = t.v >= INF;                // ∞ + ∞: both clear away for a bonus
+      await bubbleMerge(t, srcs, t.v * Math.pow(2, ns.length)); // ×2, ×4 or ×8
+      const tp = find(t) || [hc, hr];
+      if (infPair) clearInfinity(t, tp);
+      else addScore(t.v, tp[0], tp[1]);
+      await sleep(srcs.length === 1 ? 100 : 130);
+
+      const moved = compact();
+      const pos = find(t);
+      focus = pos ? [pos, ...moved] : moved;
+      if (moved.length) await sleep(200);
+    }
+    return merges;
+  }
+
+  // As bigger tiles appear, the smallest values retire from play.
+  // Reaching a new level only announces it - blocks are never removed. Until the
+  // old level's blocks are cleared, the launcher keeps mixing in their values.
+  async function levelCheck() {
+    const want = 10 * levelOf(maxV) + 1;   // smallest value of the new level's range
+    if (want <= minE) return;
+    minE = want;
+    oldStart = oldBlocks().length;
+    banner = { text: want >= 21 ? 'M level unlocked!' : 'K level unlocked!', life: 2.4 };
+  }
+
+  // Free: trade the current tile with the next one.
+  function swap() {
+    if (busy || over || tool) return;
+    [cur, nxt] = [nxt, cur];
+    shooter.v = cur; shooter.s = 0.7; shooter.wob = { amp: 0.15, t: 0 };
+    updateHud(); save();
+  }
+
+  // ---------- paid helpers ----------
+  function toggleTool(name, free = false) {
+    if (busy) return;
+    if (tool === name) {
+      tool = null; sel = null; toolFree = false; updateHud();
+      if (!fits(cur) && !fits(nxt)) gameOver();   // backed out of a rescue: still stuck
+      return;
+    }
+    free = free && name === 'hammer' && freeHammer;
+    if (over || (coins < COST[name] && !free)) return;
+    tool = name; sel = null; toolFree = free;
+    hideOverlay();
+    updateHud();
+  }
+
+  async function useToolAt(c, r) {
+    if (busy || !tool) return;
+    const t = grid[c] && grid[c][r];
+    if (!t) return;
+    if (tool === 'hammer') {
+      takeSnap();
+      if (toolFree) { freeHammer = false; toolFree = false; }
+      else setCoins(coins - COST.hammer);
+      tool = null; busy = true;
+      fadeGhost(t, cell * 0.5);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        floaters.push({ text: '✦', x: t.x + cell / 2, y: t.y + cell / 2, vx: Math.cos(a) * cell * 2, vy: Math.sin(a) * cell * 2, life: 0.6, color: colorOf(t.v) });
+      }
+      grid[c][r] = null;
+      updateHud();
+      await sleep(180);
+      const moved = compact();
+      if (moved.length) await sleep(200);
+      const combo = await resolve(moved);
+      rewardCombo(combo);
+      finishTurn();
+    } else if (tool === 'swap') {
+      if (!sel) { sel = [c, r]; updateHud(); return; }
+      const [sc, sr] = sel;
+      if (sc === c && sr === r) { sel = null; updateHud(); return; }
+      const o = grid[sc][sr];
+      if (o.v === t.v) { sel = [c, r]; updateHud(); return; } // swapping equals does nothing
+      takeSnap();
+      setCoins(coins - COST.swap);
+      tool = null; sel = null; busy = true;
+      grid[sc][sr] = t; grid[c][r] = o;
+      t.s = o.s = 1.15;
+      t.wob = { amp: 0.12, t: 0 }; o.wob = { amp: 0.12, t: 0 };
+      updateHud();
+      await sleep(260);
+      const combo = await resolve([[c, r], [sc, sr]]);
+      rewardCombo(combo);
+      finishTurn();
+    }
+  }
+
+  // ---------- game lifecycle ----------
+  function newGame() {
+    grid = Array.from({ length: COLS }, () => Array(ROWS).fill(null));
+    score = 0; maxV = 2; minE = 1; oldStart = 0; over = false; busy = false;
+    ghosts = []; floaters = []; flyers = []; bubbles = []; banner = null; praise = null;
+    tool = null; sel = null; snap = null; lastEarned = 0;
+    clearCoinFlights();
+    bag = []; bagKey = ''; rescueUsed = false; freeHammer = false; toolFree = false;
+    cur = rollValue(); nxt = rollValue(); nxt2 = rollValue();
+    gameId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    shooter = newTile(cur, cellX(aim), launchY());
+    hideOverlay();
+    store.del(SAVE_KEY);
+    updateHud();
+  }
+
+  // Saved after every move, game over included, so a reload can still offer
+  // Undo / the rescue; New game (or Play again) is what clears it.
+  function save() {
+    store.set(SAVE_KEY, JSON.stringify({
+      g: grid.map(col => col.map(t => (t ? t.v : 0))),
+      cur, nxt, nxt2, score, maxV, minE, snap, lastEarned, gameId, oldStart, rescueUsed, freeHammer,
+    }));
+  }
+
+  function load() {
+    try {
+      const d = JSON.parse(store.get(SAVE_KEY) || 'null');
+      if (!d || !Array.isArray(d.g) || d.g.length !== COLS) return false;
+      setGrid(d.g);
+      cur = d.cur; nxt = d.nxt; score = d.score; maxV = d.maxV; minE = d.minE || 1; over = false;
+      snap = d.snap || null; lastEarned = d.lastEarned || 0;
+      gameId = d.gameId || Date.now().toString(36);
+      oldStart = d.oldStart || 0;
+      nxt2 = d.nxt2 || rollValue();
+      rescueUsed = !!d.rescueUsed; freeHammer = !!d.freeHammer;
+      minE = Math.min(minE, 10 * levelOf(maxV) + 1);
+      shooter = newTile(cur, cellX(aim), launchY());
+      compact();
+      updateHud();
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- scoreboard (top 10, saved on this device) ----------
+  function loadBoard() {
+    try {
+      const b = JSON.parse(store.get(BOARD_KEY) || '[]');
+      return Array.isArray(b) ? b.filter(e => e && typeof e.score === 'number') : [];
+    } catch (e) { return []; }
+  }
+  function saveBoard(b) { store.set(BOARD_KEY, JSON.stringify(b)); }
+  const sortBoard = b => b.sort((a, c) => c.score - a.score || a.date - c.date);
+
+  // Rank this game would get (1-based), or 0 if it doesn't make the top 10.
+  function rankFor(sc) {
+    if (sc <= 0) return 0;
+    const others = loadBoard().filter(e => e.id !== gameId);
+    const rank = others.filter(e => e.score >= sc).length + 1;
+    return rank <= BOARD_SIZE ? rank : 0;
+  }
+
+  function addToBoard(name) {
+    let b = loadBoard().filter(e => e.id !== gameId); // continuing a game replaces its entry
+    b.push({ id: gameId, name, score, tile: maxV, date: Date.now() });
+    b = sortBoard(b).slice(0, BOARD_SIZE);
+    saveBoard(b);
+    store.set(INITIALS_KEY, name);
+  }
+
+  const esc = t => String(t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+  function boardHtml(highlightId) {
+    const b = sortBoard(loadBoard());
+    if (!b.length) return '<p class="board-empty">No scores yet — finish a game to get on the board!</p>';
+    return '<ol class="board-list">' + b.map((e, i) => `
+      <li class="${e.id === highlightId ? 'me' : ''}">
+        <span class="rk">${i + 1}</span>
+        <span class="nm">${esc(e.name)}</span>
+        <span class="sc">${e.score.toLocaleString()}</span>
+        <span class="tl">${fmt(e.tile || 2)}</span>
+      </li>`).join('') + '</ol>';
+  }
+
+  function showScoreboard() {
+    if (busy) return;
+    showOverlay(`
+      <h2>🏆 Scoreboard</h2>
+      ${boardHtml(null)}
+      <button class="primary" id="closeBtn">Close</button>`);
+    $('closeBtn').onclick = hideOverlay;
+  }
+
+  function gameOver() {
+    over = true;
+    tool = null; sel = null;
+    save();
+    const rank = rankFor(score);
+    const already = loadBoard().some(e => e.id === gameId);
+    renderGameOver(rank > 0 && !already ? 'enter' : 'board', rank);
+    // continuing after saving: keep the saved entry up to date automatically
+    if (already && rank > 0) {
+      const e = loadBoard().find(x => x.id === gameId);
+      if (e && score > e.score) { addToBoard(e.name); renderGameOver('board', rank); }
+    }
+  }
+
+  function renderGameOver(mode, rank) {
+    const canUndo = snap && coins - lastEarned >= COST.undo;
+    const canHammer = coins >= COST.hammer;
+    const canRescue = (!rescueUsed || freeHammer) && countTiles() > 0;
+    const entry = mode === 'enter' ? `
+      <div class="newhs">NEW HIGH SCORE — RANK #${rank}!</div>
+      <p>Enter your initials</p>
+      <input id="initials" class="initials" maxlength="3" autocomplete="off" autocapitalize="characters"
+             spellcheck="false" inputmode="text" value="${esc(store.get(INITIALS_KEY) || '')}" aria-label="Your 3 initials">
+      <button class="primary" id="saveScore">Save score</button>` : boardHtml(gameId);
+    showOverlay(`
+      <h2>Board full!</h2>
+      <div class="big">${score.toLocaleString()}</div>
+      <p>Biggest tile: <b>${fmt(maxV)}</b> · Coins: <span class="coin"></span> <b>${coins.toLocaleString()}</b></p>
+      ${entry}
+      ${canRescue ? `<button class="primary" id="goRescue">🎁 Free Hammer — once per game</button>` : ''}
+      ${canUndo || canHammer ? `<p>Keep going with a helper?</p><div class="row">
+        ${canUndo ? `<button id="goUndo">↶ Undo <span class="coin"></span> ${COST.undo}</button>` : ''}
+        ${canHammer ? `<button id="goHammer">🔨 Hammer <span class="coin"></span> ${COST.hammer}</button>` : ''}
+      </div>` : ''}
+      <button class="${mode === 'enter' ? '' : 'primary'}" id="againBtn">Play again</button>`);
+    $('againBtn').onclick = newGame;
+    if (canUndo) $('goUndo').onclick = undo;
+    if (canHammer) $('goHammer').onclick = () => { over = false; toggleTool('hammer'); };
+    if (canRescue) $('goRescue').onclick = () => { rescueUsed = true; freeHammer = true; over = false; toggleTool('hammer', true); };
+    if (mode === 'enter') {
+      const inp = $('initials'), btn = $('saveScore');
+      const sync = () => {
+        const v = inp.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+        if (inp.value !== v) inp.value = v;
+        btn.disabled = v.length !== 3;
+      };
+      const submit = () => {
+        sync();
+        if (inp.value.length !== 3) { inp.focus(); return; }
+        addToBoard(inp.value);
+        renderGameOver('board', rank);
+      };
+      inp.addEventListener('input', sync);
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+      btn.onclick = submit;
+      sync();
+      setTimeout(() => { try { inp.focus(); inp.select(); } catch (e) {} }, 50);
+    }
+  }
+
+  function showHelp() {
+    showOverlay(`
+      <h2>How to play</h2>
+      <ul>
+        <li>Tap a column (or use ← → and Space) to shoot your tile up.</li>
+        <li>Tiles stick to the ceiling. Equal numbers that touch merge and double.</li>
+        <li>Chain 2+ merges in one shot for a <b>combo</b>. Bigger combos earn bigger praise and more <span class="coin"></span> coins.</li>
+        <li>Spend coins on helpers: <b>Swap</b> two blocks (200), <b>Hammer</b> a block (250), or <b>Undo</b> your last play (25).</li>
+        <li>Switch (S) trades your current tile with the next one — free.</li>
+        <li>Three levels: <b>2–2048</b>, then <b>4K–2048K</b>, then <b>4M–2048M</b>, each with fancier blocks. Leftover blocks from the previous level keep turning up in the launcher until you've cleared them.</li>
+        <li>Merge past 2048M to make an <b>∞ block</b> — the ultimate tile. Each new ∞ pays 500 coins, and two ∞ that touch clear away for 250 more. Your ∞ count is shown at the top.</li>
+        <li>Stuck? Once per game you get a free Hammer to dig yourself out.</li>
+        <li>Game ends when neither tile can be placed.</li>
+      </ul>
+      <div class="row"><button id="boardBtn">🏆 Scoreboard</button><button class="primary" id="closeBtn">Got it</button></div>`);
+    $('closeBtn').onclick = hideOverlay;
+    $('boardBtn').onclick = showScoreboard;
+  }
+
+  function showOverlay(html) { $('card').innerHTML = html; $('overlay').classList.add('show'); }
+  function hideOverlay() { $('overlay').classList.remove('show'); }
+
+  // ---------- rendering ----------
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // Chunky 3D block: dark base lip, gradient face, gloss, outlined white number.
+  // Look of a block by tier: face gradient, base lip, rim, text colours, extras.
+  const styleCache = new Map();
+  function tileStyle(v) {
+    if (styleCache.has(v)) return styleCache.get(v);
+    const e = log2(v), t = tierOfE(e);
+    let st;
+    if (t === 0) {
+      const c = colorOf(v);
+      st = { top: shade(c, 0.16), bot: shade(c, -0.06), lip: shade(c, -0.42), stroke: shade(c, -0.6),
+        gloss: 0.13, glow: v >= 2048 ? c : null, rim: null, gold: false, shimmer: false };
+    } else if (t === 1 || t === 2) {
+      const [h, s0, l0] = baseHsl(e, t);
+      // brighter versions of the same muted hues, soft champagne rim; M adds a shine
+        const s = s0 + 14 * t, l = l0 + (t === 1 ? 7 : 11);
+        st = { top: hsl(h, s, l + 8), bot: hsl(h + (t === 2 ? 10 : 0), s, l - 4), lip: hsl(h, s - 10, l - 26),
+          stroke: hsl(h, s - 15, l - 38), gloss: 0.2, glow: hsl(h, s, l),
+          rim: t === 1 ? ['rgba(255,244,214,.75)', 'rgba(232,206,150,.55)'] : ['#fff6dd', '#e9cf8f', '#b89452'],
+          rimW: t === 1 ? 0.018 : 0.028, gold: false, shimmer: t === 2 };
+    } else {
+      st = { top: '#3b1f63', bot: '#120b22', lip: '#07040f', stroke: '#2a1700',
+        gloss: 0.16, glow: '#a78bfa', rim: 'rainbow', rimW: 0.045, gold: true, shimmer: true, inf: true };
+    }
+    styleCache.set(v, st);
+    return st;
+  }
+
+  // Same look for the small DOM "Next" preview.
+  function tileCss(v) {
+    const st = tileStyle(v);
+    const border = st.rim === 'rainbow' ? '2px solid #f472b6' : st.rim ? `2px solid ${st.rim[1]}` : '0';
+    return { bg: `linear-gradient(180deg, ${st.top}, ${st.bot})`, fg: st.gold ? '#fde68a' : '#fff', border };
+  }
+
+  let nowMs = 0;
+  function drawTile(v, x, y, sx, sy, alpha, label, round = 0, noText = false) {
+    const st = tileStyle(v);
+    const col = colorOf(v);
+    const pad = cell * 0.035;
+    const w = (cell - pad * 2) * Math.max(0.05, sx), h = (cell - pad * 2) * Math.max(0.05, sy);
+    const cx = x + cell / 2, cy = y + cell / 2;
+    const left = cx - w / 2, top = cy - h / 2;
+    const lip = h * 0.11 * (1 - round * 0.6), rad = Math.min(w, h) * (0.13 + 0.37 * round);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (st.glow) {
+      ctx.shadowColor = st.glow;
+      ctx.shadowBlur = cell * (st.inf ? 0.45 + 0.15 * Math.sin(nowMs / 300) : 0.3);
+    }
+    rr(left, top, w, h, rad);
+    ctx.fillStyle = st.lip;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    const g = ctx.createLinearGradient(0, top, 0, top + h - lip);
+    g.addColorStop(0, st.top);
+    g.addColorStop(1, st.bot);
+    rr(left, top, w, h - lip, rad);
+    ctx.fillStyle = g;
+    ctx.fill();
+    rr(left + w * 0.06, top + h * 0.05, w * 0.88, (h - lip) * 0.36, rad * 0.8);
+    ctx.fillStyle = `rgba(255,255,255,${st.gloss})`;
+    ctx.fill();
+    if (st.shimmer) {                       // light sweeping across premium blocks
+      ctx.save();
+      rr(left, top, w, h - lip, rad);
+      ctx.clip();
+      const ph = ((nowMs / 1700 + (log2(v) % 7) * 0.13) % 1.6) - 0.3;
+      const sx0 = left + w * ph;
+      const sg = ctx.createLinearGradient(sx0 - w * 0.3, top, sx0 + w * 0.3, top + h);
+      sg.addColorStop(0, 'rgba(255,255,255,0)');
+      sg.addColorStop(0.5, 'rgba(255,255,255,0.28)');
+      sg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(left, top, w, h);
+      ctx.restore();
+    }
+    if (st.rim) {                           // metallic / rainbow rim on higher tiers
+      const rw = Math.max(1.5, cell * st.rimW);
+      let rs;
+      if (st.rim === 'rainbow') {
+        rs = ctx.createLinearGradient(left, top, left + w, top + h);
+        const off = (nowMs / 2000) % 1;
+        ['#f472b6', '#facc15', '#4ade80', '#22d3ee', '#a78bfa', '#f472b6'].forEach((c, k) =>
+          rs.addColorStop((k / 5 + off) % 1, c));
+      } else {
+        rs = ctx.createLinearGradient(left, top, left + w * 0.4, top + h);
+        st.rim.forEach((c, k) => rs.addColorStop(k / (st.rim.length - 1), c));
+      }
+      rr(left + rw / 2, top + rw / 2, w - rw, h - rw, Math.max(1, rad - rw / 2));
+      ctx.lineWidth = rw;
+      ctx.strokeStyle = rs;
+      ctx.stroke();
+    }
+
+    if (noText) { ctx.restore(); return; }
+    const text = label || fmt(v);
+    const len = text.length;
+    let fs = Math.min(w, h) * (st.inf ? 0.72 : len <= 2 ? 0.5 : len === 3 ? 0.42 : len === 4 ? 0.34 : 0.28);
+    ctx.font = `900 ${fs}px ${FONT}`;
+    const maxW = w * 0.86, tw = ctx.measureText(text).width;
+    if (tw > maxW) { fs *= maxW / tw; ctx.font = `900 ${fs}px ${FONT}`; }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    const ty = top + (h - lip) / 2 + fs * 0.04;
+    ctx.lineWidth = fs * 0.22;
+    ctx.strokeStyle = st.stroke;
+    ctx.strokeText(text, cx, ty + fs * 0.07);   // drop shadow
+    ctx.strokeText(text, cx, ty);
+    if (st.gold) {                          // gold lettering on premium tiers
+      const tg = ctx.createLinearGradient(0, ty - fs / 2, 0, ty + fs / 2);
+      tg.addColorStop(0, '#fff7d1'); tg.addColorStop(0.5, '#fcd34d'); tg.addColorStop(1, '#d99a12');
+      ctx.fillStyle = tg;
+    } else ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, cx, ty);
+    ctx.restore();
+  }
+
+  // Squash/stretch scale for a tile from its wobble, flight and pop state.
+  function tileScale(t) {
+    let f = 0;
+    if (t.wob) f = t.wob.amp * Math.exp(-7 * t.wob.t) * Math.cos(22 * t.wob.t);
+    let st = 0;
+    if (t.fly) { const p = Math.min(1, t.fly.t / t.fly.dur); st = t.fly.stretch * p; }
+    return [t.s * (1 + f) * (1 - st * 0.45), t.s * (1 - f) * (1 + st)];
+  }
+  function drawT(t) {
+    const [sx, sy] = tileScale(t);
+    let round = 0;
+    if (t.mt) { const p = Math.min(1, t.mt.t / t.mt.dur); round = Math.sin(Math.PI * p) * 0.85; }
+    drawTile(t.show || t.v, t.x, t.y, sx, sy, 1, null, round);
+  }
+
+  // Moves a tile toward its slot. Vertical moves are flights that start slow and
+  // speed up (ease-in) and end with a squash; sideways moves just glide.
+  function stepTile(t, tx, ty, dt, k, ks) {
+    if (t.ty == null) { t.ty = ty; }
+    if (Math.abs(ty - t.ty) > 0.5) {
+      const rows = Math.abs(ty - t.y) / cell;
+      t.fly = { y0: t.y, y1: ty, t: 0, dur: 0.09 + 0.05 * rows, land: 0.12, stretch: 0.08 };
+      t.ty = ty;
+    }
+    if (t.fly) {
+      t.fly.t += dt;
+      const p = Math.min(1, t.fly.t / t.fly.dur);
+      t.y = t.fly.y0 + (t.fly.y1 - t.fly.y0) * p * p * p;
+      if (p >= 1) {
+        t.y = t.fly.y1;
+        if (t.fly.land) t.wob = { amp: t.fly.land, t: 0 };
+        t.fly = null;
+      }
+    } else {
+      t.y += (ty - t.y) * k;
+    }
+    t.x += (tx - t.x) * k;
+    t.s += (1 - t.s) * ks;
+    if (t.wob) { t.wob.t += dt; if (t.wob.t > 1.2) t.wob = null; }
+    if (t.mt) { t.mt.t += dt; if (t.mt.t > t.mt.dur) t.mt = null; }
+  }
+
+  // The gooey bridge between two merging bubbles.
+  function drawNeck(x1, y1, x2, y2, w1, w2, neck, color) {
+    const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy) || 1;
+    const nx = -dy / d, ny = dx / d;
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    ctx.beginPath();
+    ctx.moveTo(x1 + nx * w1 / 2, y1 + ny * w1 / 2);
+    ctx.quadraticCurveTo(mx + nx * neck / 2, my + ny * neck / 2, x2 + nx * w2 / 2, y2 + ny * w2 / 2);
+    ctx.lineTo(x2 - nx * w2 / 2, y2 - ny * w2 / 2);
+    ctx.quadraticCurveTo(mx - nx * neck / 2, my - ny * neck / 2, x1 - nx * w1 / 2, y1 - ny * w1 / 2);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+    last = now;
+    const k = 1 - Math.exp(-dt * 20);
+    const ks = 1 - Math.exp(-dt * 14);
+
+    if (Math.abs(wrap.clientWidth - W) > 1 || Math.abs(wrap.clientHeight - H) > 1 ||
+        (window.devicePixelRatio || 1) !== dpr) onResize();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    stepCoins(now);
+    nowMs = now;
+
+    // board background and lanes
+    rr(bx - 6, by - 6, cell * COLS + 12, cell * ROWS + 12, 16);
+    ctx.fillStyle = '#1b1830';
+    ctx.fill();
+    for (let c = 0; c < COLS; c++) {
+      let off = 0;
+      if (shake && shake.c === c) off = Math.sin(shake.t * 60) * 5 * (shake.t / 0.35);
+      const n = count(c);
+      ctx.fillStyle = n >= ROWS - 1 ? '#3a2335'
+        : c === aim && !over && !tool ? '#2d2948' : '#26223d';
+      rr(cellX(c) + 2 + off, by, cell - 4, cell * ROWS, 10);
+      ctx.fill();
+    }
+    if (shake) { shake.t -= dt; if (shake.t <= 0) shake = null; }
+
+    // landing preview: dashed outline where the shot will land
+    if (!over && !busy && !tool && shooter) {
+      const lr = landingRow(aim, cur);
+      if (lr >= 0 && count(aim) < ROWS) {
+        ctx.save();
+        ctx.setLineDash([cell * 0.09, cell * 0.06]);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        rr(cellX(aim) + cell * 0.06, cellY(lr) + cell * 0.06, cell * 0.88, cell * 0.88, cell * 0.1);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // gooey necks + tiles being absorbed / cleared
+    ghosts = ghosts.filter(g => (g.kind === 'absorb' ? g.t < g.dur : g.a > 0));
+    for (const g of ghosts) {
+      if (g.kind !== 'absorb') continue;
+      g.t += dt;
+      const p = Math.max(0, Math.min(1, g.t / g.dur));
+      const e = p * p;                 // ease-in: slow start, then sucked in fast
+      g.x = g.x0 + (g.target.x - g.x0) * e;
+      g.y = g.y0 + (g.target.y - g.y0) * e;
+      g.sc = 1 - 0.5 * e;
+      if (g.t < 0) continue;           // still waiting its turn
+      drawNeck(g.x + cell / 2, g.y + cell / 2, g.target.x + cell / 2, g.target.y + cell / 2,
+        cell * 0.8 * g.sc, cell * 0.8, cell * (0.38 + 0.45 * e), shade(colorOf(g.v), -0.02));
+    }
+    for (const g of ghosts) {
+      if (g.kind === 'absorb') drawTile(g.v, g.x, g.y, g.sc * (1 + 0.12 * (1 - g.sc)), g.sc, 1, null, Math.min(1, (1 - g.sc) * 3), g.t / g.dur > 0.45);
+      else {
+        g.x += (g.tx - g.x) * k;
+        g.y += (g.ty - g.y) * k;
+        g.a -= dt * 4.5;
+        drawTile(g.v, g.x, g.y, 0.9, 0.9, Math.max(0, Math.min(1, g.a)));
+      }
+    }
+
+    // shots heading into a full column
+    for (const f of flyers) { stepTile(f, f.x, f.ty, dt, k, ks); drawT(f); }
+
+    // board tiles
+    if (grid) for (let c = 0; c < COLS; c++)
+      for (let r = 0; r < ROWS; r++) {
+        const t = grid[c][r];
+        if (!t) continue;
+        stepTile(t, cellX(c), cellY(r), dt, k, ks);
+        drawT(t);
+        if (tool && !busy) {
+          const isSel = sel && sel[0] === c && sel[1] === r;
+          const pulse = 0.5 + 0.5 * Math.sin(now / 160);
+          rr(t.x + cell * 0.03, t.y + cell * 0.03, cell * 0.94, cell * 0.94, cell * 0.14);
+          ctx.lineWidth = isSel ? 4 : 2.5;
+          ctx.strokeStyle = isSel ? '#ffffff'
+            : tool === 'hammer' ? `rgba(255,111,111,${0.35 + 0.5 * pulse})`
+            : `rgba(255,211,77,${0.3 + 0.45 * pulse})`;
+          ctx.stroke();
+        }
+      }
+
+    // merge bubbles
+    bubbles = bubbles.filter(b => b.life > 0);
+    for (const b of bubbles) {
+      b.life -= dt;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      b.vx *= 1 - dt * 3; b.vy = b.vy * (1 - dt * 3) - cell * dt * 1.5;
+      const a = Math.max(0, Math.min(1, b.life * 2.2));
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = b.col; ctx.globalAlpha = a * 0.45; ctx.fill();
+      ctx.globalAlpha = a; ctx.lineWidth = Math.max(1, b.r * 0.22); ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.22, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff'; ctx.fill();
+      ctx.restore();
+    }
+
+    // launcher: a row of slots with arrows; the tile sits in the aimed slot
+    const ly = launchY();
+    const sp = cell * 0.035;
+    for (let c = 0; c < COLS; c++) {
+      const x = cellX(c);
+      rr(x + sp, ly + sp, cell - sp * 2, cell - sp * 2, cell * 0.12);
+      ctx.fillStyle = '#17142b';
+      ctx.fill();
+      rr(x + sp, ly + sp, cell - sp * 2, cell - sp * 2 - cell * 0.09, cell * 0.12);
+      ctx.fillStyle = c === aim && !over && !tool ? '#2f2a4d' : '#25213c';
+      ctx.fill();
+      if (c !== aim || over || !shooter || busy) {
+        const ax = x + cell / 2, ay = ly + cell * 0.44, as = cell * 0.09;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay - as); ctx.lineTo(ax + as * 1.2, ay + as * 0.7); ctx.lineTo(ax - as * 1.2, ay + as * 0.7);
+        ctx.closePath();
+        ctx.fillStyle = c === aim && !over ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.22)';
+        ctx.fill();
+      }
+    }
+    if (shooter && !over) {
+      shooter.x += (cellX(aim) - shooter.x) * k;
+      shooter.y += (ly - shooter.y) * k;
+      shooter.s += (1 - shooter.s) * ks;
+      if (shooter.wob) { shooter.wob.t += dt; if (shooter.wob.t > 1.2) shooter.wob = null; }
+      drawT(shooter);
+    }
+
+    // floating score text
+    floaters = floaters.filter(f => f.life > 0);
+    for (const f of floaters) {
+      f.life -= dt * 1.4;
+      if (f.vx !== undefined) { f.x += f.vx * dt; f.y += f.vy * dt; }
+      else f.y -= dt * cell * 0.9;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, f.life * 1.5));
+      ctx.fillStyle = f.color || '#ffffff';
+      ctx.font = `800 ${cell * 0.3}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(f.text, f.x, f.y);
+      ctx.restore();
+    }
+
+    // combo praise: bigger combos get bigger, longer, wobblier text
+    if (praise) {
+      praise.life -= dt;
+      praise.s += (1 - praise.s) * (1 - Math.exp(-dt * 12));
+      const a = Math.max(0, Math.min(1, praise.life * 2.5));
+      const cx = bx + cell * COLS / 2;
+      const cy = by + cell * ROWS * 0.42;
+      const size = Math.min(cell * (0.55 + praise.tier * 0.06), W / (praise.text.length * 0.62));
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.sin(now / 90) * 0.02 * praise.tier);
+      ctx.scale(praise.s, praise.s);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `900 ${size}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = size * 0.16;
+      ctx.strokeStyle = '#14112a';
+      ctx.strokeText(praise.text, 0, 0);
+      if (praise.tier >= 4) { ctx.shadowColor = praise.color; ctx.shadowBlur = size * 0.5; }
+      ctx.fillStyle = praise.color;
+      ctx.fillText(praise.text, 0, 0);
+      ctx.shadowBlur = 0;
+      // coin line
+      const fs = size * 0.36;
+      ctx.font = `800 ${fs}px system-ui, sans-serif`;
+      const sub = praise.sub;
+      const tw = ctx.measureText(sub).width;
+      const sy = size * 0.75;
+      ctx.lineWidth = fs * 0.25;
+      ctx.strokeText(sub, -fs * 0.6, sy);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(sub, -fs * 0.6, sy);
+      const coinX = -fs * 0.6 + tw / 2 + fs * 0.7;
+      const g = ctx.createRadialGradient(coinX - fs * 0.15, sy - fs * 0.15, 1, coinX, sy, fs * 0.45);
+      g.addColorStop(0, '#fff3b0'); g.addColorStop(0.55, '#ffc93c'); g.addColorStop(1, '#d99a12');
+      ctx.beginPath(); ctx.arc(coinX, sy, fs * 0.42, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+      ctx.restore();
+      if (praise.life <= 0) praise = null;
+    }
+
+    // level-up banner
+    if (banner) {
+      banner.life -= dt;
+      const a = Math.max(0, Math.min(1, banner.life * 2));
+      ctx.save();
+      ctx.globalAlpha = a;
+      const bh = cell * 0.7;
+      const bY = by + cell * ROWS / 2 - bh / 2;
+      rr(bx + 8, bY, cell * COLS - 16, bh, 12);
+      ctx.fillStyle = 'rgba(255,211,77,0.95)';
+      ctx.fill();
+      ctx.fillStyle = '#1a1533';
+      ctx.font = `800 ${Math.min(cell * 0.26, 18)}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(banner.text, bx + cell * COLS / 2, bY + bh / 2);
+      ctx.restore();
+      if (banner.life <= 0) banner = null;
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- input ----------
+  function colAt(clientX) {
+    const r = cv.getBoundingClientRect();
+    const c = Math.floor((clientX - r.left - bx) / cell);
+    return c >= 0 && c < COLS ? c : -1;
+  }
+  cv.addEventListener('pointermove', e => {
+    const c = colAt(e.clientX);
+    if (c >= 0 && !busy) aim = c;
+  });
+  cv.addEventListener('pointerdown', e => {
+    const c = colAt(e.clientX);
+    if (c >= 0 && !busy) aim = c;
+  });
+  cv.addEventListener('pointerup', e => {
+    const c = colAt(e.clientX);
+    if (c < 0) return;
+    if (tool) {
+      const rect = cv.getBoundingClientRect();
+      const r = Math.floor((e.clientY - rect.top - by) / cell);
+      if (r >= 0 && r < ROWS) useToolAt(c, r);
+      return;
+    }
+    fire(c);
+  });
+
+  window.addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'INPUT') return;
+    if ($('overlay').classList.contains('show')) {
+      if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') {
+        e.preventDefault();
+        over ? newGame() : hideOverlay();
+      }
+      return;
+    }
+    const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); undo(); return; }
+    if (k === 'escape') { if (tool) toggleTool(tool); return; }
+    if (k === 'u') { undo(); return; }
+    if (k === 'h') { toggleTool('hammer'); return; }
+    if (tool) return;
+    if (k === 'arrowleft' || k === 'a') { if (!busy) aim = Math.max(0, aim - 1); }
+    else if (k === 'arrowright' || k === 'd') { if (!busy) aim = Math.min(COLS - 1, aim + 1); }
+    else if (k === ' ' || k === 'arrowup' || k === 'enter' || k === 'w') { e.preventDefault(); fire(aim); }
+    else if (k === 's' || k === 'arrowdown') { e.preventDefault(); swap(); }
+    else if (k === 'n') newGame();
+    else if (k >= '1' && k <= String(COLS)) fire(+k - 1);
+  });
+
+  $('swapBtn').onclick = swap;
+  $('tSwap').onclick = () => toggleTool('swap');
+  $('tHammer').onclick = () => toggleTool('hammer');
+  $('tUndo').onclick = undo;
+  $('newBtn').onclick = () => { if (!busy) newGame(); };
+  $('helpBtn').onclick = showHelp;
+  $('bestBox').onclick = showScoreboard;
+  $('overlay').addEventListener('click', e => { if (e.target.id === 'overlay' && !over) hideOverlay(); });
+
+  // Re-measure whenever the play area changes size (rotation, entering full
+  // screen / home-screen mode, browser bars appearing). Without this the canvas
+  // keeps its old pixel size and gets stretched to the new shape.
+  function onResize() {
+    layout();
+    fitStats();
+    if (shooter) { shooter.x = cellX(aim); shooter.y = launchY(); }
+    if (grid) for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) {
+      const t = grid[c][r];
+      if (t) { t.x = cellX(c); t.y = t.ty = cellY(r); t.fly = null; }
+    }
+  }
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', () => setTimeout(onResize, 250));
+  if (window.visualViewport) visualViewport.addEventListener('resize', onResize);
+  if (window.ResizeObserver) new ResizeObserver(onResize).observe(wrap);
+
+  // ---------- boot ----------
+  layout();
+  if (!load()) {
+    newGame();
+    if (!store.get(BEST_KEY)) showHelp();
+  } else if (!fits(cur) && !fits(nxt)) {
+    gameOver();
+  }
+  requestAnimationFrame(frame);
+
+  // installable / offline when served over http(s)
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+
+  // exposed for automated testing only
+  window.__mb = {
+    fire, swap, newGame, undo, toggleTool, useToolAt, comboCoins, rollValue,
+    setCoins: n => setCoins(n),
+    state: () => ({ grid: grid.map(c => c.map(t => t ? t.v : 0)), cur, nxt, nxt2, score, over, busy, coins, tool, sel, snap: !!snap, maxV, infCount, minE }),
+  };
+})();
+</script>
+</body>
+</html>
