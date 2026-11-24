@@ -1,5 +1,5 @@
 // Offline support: cache the game shell, serve cache-first, refresh in the background.
-const CACHE = 'merge-quest-v1';
+const CACHE = 'merge-quest-v2';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

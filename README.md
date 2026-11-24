@@ -2,10 +2,12 @@
 
 Number merge and game quest mash-up. Shoot numbered tiles up into columns; equal tiles that touch merge and double, chains make combos, and combos earn coins for helpers (Swap, Hammer, Undo).
 
-Two modes (switch from **Menu**):
+Two modes, picked on the **home screen** (🏠 at the top left of the game returns there):
 
 - **Levels**: 24 levels whose board grows from 2×2 to 5×7, teaching one idea at a time. Each level has a goal (make a tile, reach a score, make a combo, merge 3 or 4 at once, thin the board out, or survive), a shot limit and up to 3 stars. Levels 1–6 are scripted tutorials. New players start here.
 - **Endless**: the original Merge Blaster game, with K/M tiers, ∞ blocks and the scoreboard.
+
+Rewards: a 🔥 win streak (3 new levels in a row → start with a free Hammer, 5 → a free Swap too; a loss only drops it by 2), 🎁 chests on levels 10 and 20, and 🏅 one-time bounties for your first 2048, 4K, 4M and ∞.
 
 See [docs/roadmap.md](docs/roadmap.md) for what's next.
 
