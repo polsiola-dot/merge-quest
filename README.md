@@ -19,6 +19,37 @@ Open `index.html` in any browser. No build or install needed, and it works offli
 
 Controls: tap a column (or ← → and Space / keys 1–5) to shoot; S switches the current and next tile; H hammer; U undo; N new game / restart level; M menu.
 
+## Getting started on your computer
+
+```
+git clone https://github.com/polsiola-dot/merge-quest.git
+cd merge-quest
+npx serve .          # then open the address it prints
+```
+
+There's no build step: `index.html` is the whole game. Serving it (rather than opening the file) lets the service worker, install-as-app and offline mode work. Edit, refresh, and push to `main` to publish.
+
+Need once, to run the test bots: `npm i -D playwright && npx playwright install chromium`.
+
+### Putting it in the app stores (Phase 5)
+
+The plan is to wrap this same web app with [Capacitor](https://capacitorjs.com/), keeping the browser version too. Rough steps, from the repo root:
+
+```
+npm init -y
+npm i @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+npx cap init "Merge Quest" com.yourname.mergequest --web-dir=www
+```
+
+1. Capacitor wants the web files in one folder. Copy `index.html`, `sw.js`, `manifest.webmanifest`, the icon PNGs and `fonts/` into `www/` (the Pages workflow does the same into `_site/`; a small `npm run build` script that does this copy is enough).
+2. `npx cap add android` and `npx cap add ios`, then after each change `npm run build && npx cap sync`.
+3. Android: open with `npx cap open android` in **Android Studio**, build a signed app bundle (`.aab`) and upload it in the Google Play Console.
+4. iOS: needs a **Mac with Xcode**. `npx cap open ios`, set your team and bundle id, archive, and upload through Xcode to App Store Connect / TestFlight.
+5. Ads and purchases: add an AdMob plugin and an in-app-purchase plugin (both Capacitor plugins), plus the consent prompt, privacy policy and store forms listed in [docs/roadmap.md](docs/roadmap.md).
+6. Pick the real app id (`com.yourname.mergequest` above is a placeholder). It can't be changed after you publish.
+
+Accounts: Google Play Console ($25 one-off) and Apple Developer Program ($99 a year). Google may require a closed test with testers for about 14 days before production, so open the account early.
+
 ## Test bots
 
 Both need Playwright and run headless Chromium.
@@ -35,6 +66,8 @@ Both need Playwright and run headless Chromium.
 | `.github/workflows/pages.yml`, `_headers`, `netlify.toml` | Hosting settings (GitHub Pages, Netlify) |
 | `tools/sim.js`, `tools/levels.js` | Balance-testing bots (Endless, Levels) |
 | `docs/roadmap.md` | Plan and design rules |
+| `docs/art-prompts.md` | Image prompts for the final artwork |
+| `fonts/` | Bundled Fredoka and Lilita One fonts |
 
 ## Credits
 
