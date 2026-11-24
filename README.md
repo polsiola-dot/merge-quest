@@ -35,3 +35,7 @@ Both need Playwright and run headless Chromium.
 | `.github/workflows/pages.yml`, `_headers`, `netlify.toml` | Hosting settings (GitHub Pages, Netlify) |
 | `tools/sim.js`, `tools/levels.js` | Balance-testing bots (Endless, Levels) |
 | `docs/roadmap.md` | Plan and design rules |
+
+## Credits
+
+Fonts: [Fredoka](https://fonts.google.com/specimen/Fredoka) and [Lilita One](https://fonts.google.com/specimen/Lilita+One), both under the SIL Open Font License, bundled in `fonts/` so the game works offline.
