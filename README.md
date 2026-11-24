@@ -13,7 +13,7 @@ See [docs/roadmap.md](docs/roadmap.md) for what's next.
 
 ## Play
 
-Live: **https://play-merge-quest.netlify.app** (installable as an app, works offline). Every push to `main` deploys automatically via Netlify.
+Live: **https://polsiola-dot.github.io/merge-quest/** (installable as an app, works offline). Every push to `main` deploys automatically via GitHub Pages (`.github/workflows/pages.yml`). The older Netlify copy at play-merge-quest.netlify.app also deploys from `main` while the Netlify account has credits.
 
 Open `index.html` in any browser. No build or install needed, and it works offline. When hosted (e.g. on Netlify, configured by `netlify.toml`) it can be installed as an app from the browser's **Add to Home Screen** or **Install app**.
 
@@ -32,6 +32,6 @@ Both need Playwright and run headless Chromium.
 | --- | --- |
 | `index.html` | The whole game: HTML, CSS and JavaScript |
 | `sw.js`, `manifest.webmanifest`, icons | Offline support and install-as-app |
-| `_headers`, `netlify.toml` | Hosting settings |
+| `.github/workflows/pages.yml`, `_headers`, `netlify.toml` | Hosting settings (GitHub Pages, Netlify) |
 | `tools/sim.js`, `tools/levels.js` | Balance-testing bots (Endless, Levels) |
 | `docs/roadmap.md` | Plan and design rules |
