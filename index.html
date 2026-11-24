@@ -141,6 +141,11 @@
     align-items: center; justify-content: center; gap: 2px; font-size: 17px; font-weight: 800;
     background: var(--panel-2); position: relative;
   }
+  .worlds { display: flex; flex-direction: column; gap: 14px; max-height: min(58vh, 520px); overflow-y: auto; padding: 6px 4px; margin: 0 -4px; }
+  .world h3 { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 8px; text-align: left;
+    font: 400 18px "Lilita One", "Fredoka", sans-serif; letter-spacing: .02em; }
+  .world h3 span { font: 700 13px "Fredoka", sans-serif; color: var(--accent); }
+  .world.locked h3 { color: var(--muted); }
   .lv .st { font-size: 10px; letter-spacing: 1px; color: var(--accent); min-height: 12px; }
   .lv.next { background: var(--accent); color: #1a1533; }
   .lv.next .st { color: #1a1533; }
@@ -303,6 +308,18 @@
   .mcard .mt small { display: block; font: 600 clamp(13px, 3.6vw, 16px) "Fredoka", sans-serif; opacity: .95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mcard.m-en .mt small { color: #fff6a8; }
   .mcard .chev { font: 700 26px/1 "Fredoka", sans-serif; opacity: .9; }
+  .dcard {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: -4px 0 14px; border-radius: 20px;
+    color: #fff; text-align: left; border: 3px solid rgba(255,255,255,.35);
+    background: linear-gradient(#ff9a3d, #f2611d); box-shadow: 0 6px 0 #a33a0b, 0 10px 18px rgba(80, 30, 10, .35);
+  }
+  .dcard.done { background: linear-gradient(#41c7b9, #1c8f9a); box-shadow: 0 6px 0 #0f5b66, 0 10px 18px rgba(10, 50, 60, .35); }
+  .dcard svg.mi { width: 38px; height: 38px; flex: none; }
+  .dcard .mt { flex: 1; min-width: 0; line-height: 1.1; }
+  .dcard .mt b { display: block; font: 400 clamp(18px, 5vw, 22px) "Lilita One", sans-serif; text-shadow: 0 2px 0 rgba(0,0,0,.25); }
+  .dcard .mt small { display: block; font: 600 clamp(12px, 3.4vw, 15px) "Fredoka", sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dcard .badge { font: 400 15px "Lilita One", sans-serif; background: #fff; color: #c2410c; border-radius: 99px; padding: 4px 10px; flex: none; }
+  .dcard.done .badge { color: #0f766e; }
   .dock {
     display: flex; gap: 10px; margin: 0 -14px; padding: 12px 14px max(12px, env(safe-area-inset-bottom));
     background: linear-gradient(#4b2fb4, #2d1a7c); border-top: 3px solid rgba(255,255,255,.25);
@@ -325,6 +342,8 @@
     .modes { margin: 12px 0 10px; }
     .mcard { padding: 8px 8px 8px 10px; border-radius: 18px; }
     .mcard svg.mi { width: 34px; height: 34px; }
+    .dcard { padding: 6px 10px; margin: -2px 0 10px; }
+    .dcard svg.mi { width: 30px; height: 30px; }
     .dock { padding-top: 8px; gap: 8px; }
     .dock button { flex-direction: row; justify-content: center; gap: 6px; padding: 8px 4px; font-size: 13px; border-radius: 14px; }
     .dock svg { width: 24px; height: 24px; }
@@ -332,6 +351,15 @@
   @media (prefers-reduced-motion: reduce) {
     .burst, .buddy .bob, .cta, .twinkle { animation: none; }
   }
+  /* ---------- skins ---------- */
+  .skins { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .skin { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 16px; background: rgba(255,255,255,.06); border: 2px solid transparent; }
+  .skin.on { border-color: var(--accent); background: rgba(255,211,77,.12); }
+  .skin b { font: 400 17px "Lilita One", "Fredoka", sans-serif; }
+  .skin button { padding: 7px 4px; font-size: 14px; }
+  .sw { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 7px; border-radius: 10px; }
+  .sw i { font: 900 14px "Fredoka", sans-serif; font-style: normal; color: #fff; border-radius: 6px; padding: 5px 0 6px;
+    text-shadow: 0 1px 0 rgba(0,0,0,.4); }
   /* ---------- rewards ---------- */
   .streak { color: #ffb27a; font-weight: 700; font-size: 14px; }
   .chest {
@@ -395,7 +423,8 @@
   const SAVE_KEY = 'mergeQuest.save.v1';           // Endless game in progress
   const LEVEL_SAVE_KEY = 'mergeQuest.levelSave.v1';  // level attempt in progress
   const MODE_KEY = 'mergeQuest.mode.v1';
-  const saveKey = (m = mode) => (m === 'level' ? LEVEL_SAVE_KEY : SAVE_KEY);
+  const DAILY_SAVE_KEY = 'mergeQuest.dailySave.v1';  // daily challenge attempt in progress
+  const saveKey = (m = mode) => (m === 'level' ? LEVEL_SAVE_KEY : m === 'daily' ? DAILY_SAVE_KEY : SAVE_KEY);
   const BEST_KEY = 'mergeQuest.best.v1';
   const COIN_KEY = 'mergeQuest.coins.v1';
   const BOARD_KEY = 'mergeQuest.scoreboard.v1';
@@ -417,11 +446,32 @@
   ];
   // Each level ("tier") has its own look; higher tiers are more premium.
   // Tier 0: 2 … 2048 · Tier 1: 4K … 2048K · Tier 2: 4M … 2048M · then ∞.
-  const PALETTE = [   // level 1 colours: soft, muted (higher levels derive from these)
-    '#7d8bd6', '#3fa39a', '#d0875e', '#9170c4', '#57a062', '#d06a92',
-    '#4c80c6', '#c9a243', '#b8585d', '#46a9c4', '#dd6079'
+  // Skins: coin sinks that recolour the blocks and the board. Each palette
+  // gives 2, 4, 8 … 2048 their colours; K and M blocks derive from it.
+  const SKINS = [
+    { id: 'classic', name: 'Classic', price: 0, board: ['#1b1830', '#26223d', '#2d2948'],
+      pal: ['#7d8bd6', '#3fa39a', '#d0875e', '#9170c4', '#57a062', '#d06a92', '#4c80c6', '#c9a243', '#b8585d', '#46a9c4', '#dd6079'] },
+    { id: 'candy', name: 'Candy', price: 500, board: ['#2b1730', '#3a2142', '#47294f'],
+      pal: ['#f27ea9', '#5fc9b0', '#f6a75b', '#a982ea', '#7cc46e', '#ff7f7f', '#6fa6ec', '#e9bf4c', '#d978c0', '#4fc0d8', '#ff8f6b'] },
+    { id: 'ocean', name: 'Ocean', price: 750, board: ['#0e2033', '#142c45', '#1b3756'],
+      pal: ['#3f86d9', '#25b3a6', '#f2a541', '#6a6fe0', '#2fc4d6', '#ef6f6c', '#2a6fb5', '#9bd16a', '#5a4fc9', '#33a3dd', '#ff8c5a'] },
+    { id: 'neon', name: 'Neon', price: 1000, board: ['#0b0912', '#15111f', '#1f1830'],
+      pal: ['#ff3d9a', '#00d6bd', '#ffae00', '#8f5bff', '#2fd650', '#ff5a3d', '#00a8f0', '#d4e800', '#f23de0', '#20e8a6', '#ff7a00'] },
+    { id: 'royal', name: 'Royal', price: 1500, board: ['#1d1430', '#2a1d44', '#352654'],
+      pal: ['#c9a243', '#7d4fc9', '#c0504d', '#3f8f7a', '#d9a03a', '#9b5fd9', '#b8862f', '#2f6fb0', '#cf7a3a', '#8a4fb8', '#a8323e'] },
   ];
+  const SKIN_KEY = 'mergeQuest.skins.v1';   // { owned: [ids], on: id }
+  function loadSkins() {
+    try { const d = JSON.parse(store.get(SKIN_KEY) || 'null'); if (d && Array.isArray(d.owned)) return d; } catch (e) {}
+    return { owned: ['classic'], on: 'classic' };
+  }
+  let skin = SKINS.find(k => k.id === loadSkins().on) || SKINS[0];
+  let PALETTE = skin.pal;   // level 1 colours (higher levels derive from these)
   const INF = 4294967296;   // 2^32: anything past 2048M becomes ∞
+  // Stone blockers (Level mode): never merge. A merge next to one cracks it,
+  // a second one breaks it. Stored in the grid as negative values.
+  const STONE = -2, CRACKED = -1;
+  const S = STONE;                  // shorthand for level start boards
   const INF_KEY = 'mergeQuest.infinity.v1';
   const FONT = '"Fredoka", "Arial Rounded MT Bold", "Nunito", "Varela Round", "Trebuchet MS", system-ui, sans-serif';
   const PAIR_MS = 220;    // suck-in time when just two blocks merge
@@ -457,8 +507,10 @@
   let rescueUsed = false;            // Endless: one free Hammer per game when stuck
   let freeUses = { hammer: 0, swap: 0, undo: 0 };  // free helper uses (rescue, level samples)
   let aim = 2, busy = false;
-  let mode = store.get(MODE_KEY) === 'level' ? 'level' : 'endless';
-  let lv = null;                     // current level attempt (Level mode only)
+  let mode = ['level', 'daily'].includes(store.get(MODE_KEY)) ? store.get(MODE_KEY) : 'endless';
+  let lv = null;                     // current level or daily attempt
+  // Level and Daily play the same way (goal, shots, stars); only Endless differs.
+  const levelish = () => mode !== 'endless';
   let ghosts = [], floaters = [], banner = null, shake = null, praise = null;
   let flyers = [], bubbles = [];  // shots heading for a full column; merge bubbles
   let tool = null, sel = null;      // active helper ('swap' | 'hammer') and first swap pick
@@ -494,6 +546,12 @@
   // base hue for a K/M value: same muted family as level 1, offset so neighbours differ
   const baseHsl = (e, t) => hexToHsl(PALETTE[(e - (t === 1 ? 9 : 16)) % PALETTE.length]);
   const colorCache = new Map();
+  function applySkin(id) {
+    skin = SKINS.find(k => k.id === id) || SKINS[0];
+    PALETTE = skin.pal;
+    colorCache.clear(); styleCache.clear();
+    updateHud();
+  }
   function colorOf(v) {
     if (colorCache.has(v)) return colorCache.get(v);
     const e = log2(v), t = tierOfE(e);
@@ -563,7 +621,7 @@
 
   function eqNeighbors(c, r) {
     const t = grid[c][r];
-    if (!t) return [];
+    if (!t || t.v < 0) return [];
     const out = [];
     for (const [dc, dr] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
       const nc = c + dc, nr = r + dr;
@@ -603,7 +661,7 @@
   // as your biggest tile grows; bigger values are rarer.
   function boardMaxE() {
     let m = 0;
-    for (const t of allTiles()) if (t.v < INF) m = Math.max(m, log2(t.v));
+    for (const t of allTiles()) if (t.v > 0 && t.v < INF) m = Math.max(m, log2(t.v));
     return m;
   }
   function spawnRange() {
@@ -619,7 +677,7 @@
   }
 
   function rollValue() {
-    if (mode === 'level') return levelRoll();
+    if (levelish()) return levelRoll();
     const [lo, hi] = spawnRange();
     // While old-level blocks remain, often launch one of their values (more
     // likely for values you have several of): ~70% at first, easing to ~30%
@@ -635,7 +693,7 @@
 
   // Is v still a legal launch? (used when a previewed tile moves up the queue)
   function launchable(v) {
-    if (mode === 'level') return true;
+    if (levelish()) return true;
     const [lo, hi] = spawnRange();
     if (v >= Math.pow(2, lo) && v <= Math.pow(2, hi)) return true;
     return oldBlocks().includes(v);
@@ -838,8 +896,8 @@
   }
 
   function updateHud() {
-    const sTxt = shortScore(score), bTxt = mode === 'level' ? String(lv.n) : shortScore(best);
-    $('bestLabel').textContent = mode === 'level' ? 'Level' : 'Best 🏆';
+    const sTxt = shortScore(score), bTxt = mode === 'daily' ? dayLabel(lv.day) : mode === 'level' ? String(lv.n) : shortScore(best);
+    $('bestLabel').textContent = mode === 'daily' ? 'Daily' : mode === 'level' ? 'Level' : 'Best 🏆';
     if (sTxt !== $('score').textContent || bTxt !== $('best').textContent) {
       $('score').textContent = sTxt;
       $('best').textContent = bTxt;
@@ -860,10 +918,12 @@
     $('tSwap').classList.toggle('active', tool === 'swap');
     $('tHammer').classList.toggle('active', tool === 'hammer');
     const fitsCur = fits(cur);
-    if (mode === 'level' && !tool && !over) {
+    if (levelish() && !tool && !over) {
       const L = levelDef();
+      const toStone = L.stoneEvery ? L.stoneEvery - (lv.used % L.stoneEvery) : 0;
       $('hint').innerHTML = `<span class="goal">🎯 ${goalText(L, true)}</span>` +
-        (lv.shots ? ` · <b>${lv.shotsLeft}</b> shot${lv.shotsLeft === 1 ? '' : 's'} left` : '');
+        (lv.shots ? ` · <b>${lv.shotsLeft}</b> shot${lv.shotsLeft === 1 ? '' : 's'} left` : '') +
+        (toStone ? ` · 🪨 in <b>${toStone}</b>` : '');
       return;
     }
     $('hint').textContent = tool === 'hammer' ? 'Tap a block to smash it (tap Hammer again to cancel).'
@@ -935,6 +995,47 @@
       bubbles.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
         r: cell * rnd(radius), life: rnd(life), col: colour(i) });
     }
+  }
+
+  // ---------- stones ----------
+  const STONE_GREY = ['#d9d0c4', '#b3a796', '#8d8273', '#ffffff'];
+  const stoneDust = i => STONE_GREY[i % STONE_GREY.length];
+  // Stones next to any of the merging cells take one hit each: an intact stone
+  // cracks, a cracked one breaks. Returns how many broke (the caller compacts).
+  function hitStones(cells) {
+    const seen = new Set();
+    let broke = 0;
+    for (const [c, r] of cells) for (const [dc, dr] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+      const nc = c + dc, nr = r + dr;
+      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+      const s = grid[nc][nr];
+      if (!s || s.v >= 0 || seen.has(s)) continue;
+      seen.add(s);
+      if (s.v === STONE) {
+        s.v = CRACKED; s.s = 1.12; s.wob = { amp: 0.16, t: 0 };
+        burst(s, 6, [0.8, 0.8], [0.03, 0.04], [0.35, 0.2], stoneDust);
+      } else {
+        grid[nc][nr] = null;
+        fadeGhost(s, cell * 0.4);
+        burst(s, 16, [1.2, 1.6], [0.04, 0.07], [0.55, 0.35], stoneDust);
+        floaters.push({ text: '💥', x: s.x + cell / 2, y: s.y + cell / 2, life: 1 });
+        broke++;
+      }
+    }
+    if (broke && lv) lv.broken = (lv.broken || 0) + broke;
+    return broke;
+  }
+
+  // Level mode: a stone rises into a random column that has room.
+  function dropStone() {
+    const open = [];
+    for (let c = 0; c < cols; c++) if (count(c) < rows) open.push(c);
+    if (!open.length) return;
+    const c = open[Math.floor(Math.random() * open.length)], r = count(c);
+    const t = newTile(STONE, cellX(c), launchY());
+    t.s = 0.6; t.ty = launchY();      // stepTile turns the move into a flight
+    grid[c][r] = t;
+    banner = { text: '🪨 A stone rolled in!', life: 1.2 };
   }
 
   // ---------- one-time milestone bounties (any mode, paid once ever) ----------
@@ -1028,9 +1129,28 @@
     { cols: 5, rows: 7, goal: ['score', 400], shots: 30, spawn: 5, reward: 300, intro: 'The full board!' },
     { cols: 5, rows: 7, goal: ['score', 600], shots: 35, spawn: 5, reward: 300 },
     { cols: 5, rows: 7, goal: ['score', 750], shots: 45, spawn: 6, reward: 300 },
-    { cols: 5, rows: 7, goal: ['make', 2048], shots: 0, spawn: 6, reward: 1000, intro: 'Graduation: make a 2048! No shot limit.' },
+    { cols: 5, rows: 7, goal: ['make', 2048], shots: 0, spawn: 6, reward: 1000, grad: true, intro: 'Graduation: make a 2048! No shot limit.' },
+    // World 2: Stone Quarry. Stones block columns and only break next to merges.
+    { cols: 3, rows: 4, goal: ['break', 1], shots: 6, start: [[8, S], [2], []], queue: [2, 4, 2, 8, 4, 2], hint: 1, reward: 150, intro: 'A stone! Stones never merge. Merge next to one to crack it, then again to break it.' },
+    { cols: 4, rows: 4, goal: ['break', 2], shots: 14, spawn: 3, start: [[S], [2, 8], [4, 2], [S]], reward: 150, intro: 'Two stones in the corners. Merge beside them.' },
+    { cols: 4, rows: 5, goal: ['make', 128], shots: 34, spawn: 4, start: [[S, 2], [8], [], [4, S]], reward: 200, intro: 'Stones take up room. Break them or build around them.' },
+    { cols: 4, rows: 5, goal: ['break', 3], shots: 13, spawn: 4, start: [[2, S], [S], [8, S], [4]], reward: 200 },
+    { cols: 4, rows: 5, goal: ['score', 220], shots: 22, spawn: 4, stoneEvery: 6, reward: 200, intro: 'Now a stone rolls in every few shots. The bar shows when.' },
+    { cols: 4, rows: 6, goal: ['break', 5], shots: 10, spawn: 4, start: [[S, 4], [2, S, 8], [S, 2, S], [8, S]], hard: true, reward: 300, chest: { coins: 200, hammer: 1 }, intro: 'Hard level: a quarry full of stones. A Hammer smashes one too.' },
+    { cols: 4, rows: 6, goal: ['make', 128], shots: 40, spawn: 4, reward: 200, intro: 'A breather. No stones at all!' },
+    { cols: 5, rows: 6, goal: ['combo', 3], shots: 9, spawn: 4, start: [[32, S], [16, S], [8], [S], [S]], reward: 250, intro: 'Chains break stones too. Every merge counts.' },
+    { cols: 5, rows: 6, goal: ['leave', 2], shots: 10, start: [[S, 4], [2, 8], [S, 4], [2], [S]], queue: [2, 2, 8, 4, 2, 2, 4, 8, 2, 4], free: { undo: 2 }, reward: 250, intro: 'Clean the quarry: leave 2 or fewer blocks. Stones count!' },
+    { cols: 5, rows: 6, goal: ['make', 256], shots: 56, spawn: 5, stoneEvery: 7, reward: 300 },
+    { cols: 5, rows: 7, goal: ['break', 6], shots: 34, spawn: 5, stoneEvery: 5, hard: true, reward: 350, intro: 'Hard level: stones keep coming. Break 6 of them.' },
+    { cols: 5, rows: 7, goal: ['make', 512], shots: 0, spawn: 6, stoneEvery: 8, start: [[S], [], [S], [], [S]], reward: 800, chest: { coins: 300, hammer: 1, swap: 1 }, intro: 'Quarry finale: make a 512 while the stones roll in. No shot limit.' },
   ];
-  const levelDef = () => LEVELS[lv.n - 1];
+  // Worlds group the levels on the map; each ends with a finale.
+  const WORLDS = [
+    { name: 'Basics', from: 1, to: 24 },
+    { name: 'Stone Quarry', from: 25, to: 36 },
+  ];
+  const worldOf = n => WORLDS.find(w => n >= w.from && n <= w.to) || WORLDS[0];
+  const levelDef = () => (mode === 'daily' ? dailyDef(lv.day) : LEVELS[lv.n - 1]);
   let levelPerks = '';                 // streak bonus text for the level intro
 
   function loadProgress() {
@@ -1069,6 +1189,7 @@
       case 'merge': return `Merge <b>${v} blocks</b> at once`;
       case 'leave': return `Leave <b>${v} or fewer</b> blocks` + (pr ? ` (now ${countTiles()})` : '');
       case 'survive': return `Survive <b>${v} shots</b> without filling up`;
+      case 'break': return `Break <b>${v} stone${v === 1 ? '' : 's'}</b>` + (pr ? ` (${Math.min(v, lv.broken || 0)}/${v})` : '');
     }
     return '';
   }
@@ -1082,6 +1203,7 @@
       case 'merge': return lv.bestMerge >= v;
       case 'leave': return lv.used > 0 && countTiles() <= v;
       case 'survive': return lv.shots > 0 && lv.shotsLeft <= 0;
+      case 'break': return (lv.broken || 0) >= v;
     }
     return false;
   }
@@ -1092,9 +1214,139 @@
     return drawFromBag(1, L.spawn || 3);
   }
 
-  function startLevel(n) {
-    const L = LEVELS[n - 1];
-    mode = 'level';
+  function startLevel(n) { beginAttempt(LEVELS[n - 1], 'level', { n }); }
+
+  // ---------- Daily challenge ----------
+  // One board a day, the same for everyone: the date seeds the start board and
+  // the whole tile queue. The goal type rotates day by day. First win of the
+  // day pays coins; there's no daily streak to lose (see the design rules).
+  const DAILY_KEY = 'mergeQuest.daily.v1';    // { won: { 'YYYY-MM-DD': stars } }
+  const DAILY_REWARD = 150;
+  const DAILY_GOALS = [
+    { goal: ['score', 500], shots: 30, spawn: 5 },
+    { goal: ['break', 4], shots: 20, spawn: 4, stones: 5 },
+    { goal: ['make', 256], shots: 60, spawn: 5 },
+    { goal: ['combo', 4], shots: 16, spawn: 4 },
+    { goal: ['score', 380], shots: 26, spawn: 4, stones: 3, stoneEvery: 7 },
+    { goal: ['merge', 3], shots: 12, spawn: 4 },
+    { goal: ['make', 128], shots: 30, spawn: 4, stones: 2 },
+  ];
+  const pad2 = n => String(n).padStart(2, '0');
+  const todayKey = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const dayNumber = key => { const [y, m, d] = key.split('-').map(Number); return Math.floor(Date.UTC(y, m - 1, d) / 864e5); };
+  const dayLabel = key => { const [, m, d] = key.split('-').map(Number); return `${d} ${'JanFebMarAprMayJunJulAugSepOctNovDec'.substr((m - 1) * 3, 3)}`; };
+  function seeded(seed) {                     // mulberry32
+    return () => {
+      seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  let dailyCache = null;
+  function dailyDef(key) {
+    if (dailyCache && dailyCache.key === key) return dailyCache.L;
+    const dn = dayNumber(key), rnd = seeded(dn * 2654435761);
+    const T = DAILY_GOALS[((dn % DAILY_GOALS.length) + DAILY_GOALS.length) % DAILY_GOALS.length];
+    const cols = 5, rows = T.goal[0] === 'make' && T.goal[1] >= 256 ? 7 : 6;
+    const pick = () => Math.pow(2, 1 + Math.floor(rnd() * Math.min(T.spawn, 4)));
+    // start board: 0-3 tiles per column, no equal neighbours, stones mixed in
+    const g = Array.from({ length: cols }, () => Array(rows).fill(0));
+    for (let c = 0; c < cols; c++) {
+      const h = Math.floor(rnd() * 4);
+      for (let r = 0; r < h; r++) {
+        let v = 0;
+        for (let k = 0; k < 12 && !v; k++) {
+          const cand = pick();
+          if (g[c][r - 1] !== cand && (c === 0 || g[c - 1][r] !== cand)) v = cand;
+        }
+        if (!v) break;                  // no safe value: keep the column shorter
+        g[c][r] = v;
+      }
+    }
+    for (let k = 0; k < (T.stones || 0); k++) {
+      const c = Math.floor(rnd() * cols), r = g[c].indexOf(0);
+      if (r >= 0 && r < rows - 2) g[c][r] = STONE;
+    }
+    // the queue: the same weighted bags as random levels, but seeded
+    const queue = [];
+    while (queue.length < 400) {
+      const bagQ = [];
+      let total = 0;
+      for (let e = 1; e <= T.spawn; e++) total += Math.pow(0.6, e - 1);
+      for (let e = 1; e <= T.spawn; e++) {
+        const n = Math.max(1, Math.round(Math.pow(0.6, e - 1) / total * 40));
+        for (let k = 0; k < n; k++) bagQ.push(Math.pow(2, e));
+      }
+      for (let i = bagQ.length - 1; i > 0; i--) {
+        const j = Math.floor(rnd() * (i + 1));
+        [bagQ[i], bagQ[j]] = [bagQ[j], bagQ[i]];
+      }
+      queue.push(...bagQ);
+    }
+    const L = { cols, rows, goal: T.goal, shots: T.shots, spawn: T.spawn, stoneEvery: T.stoneEvery,
+      start: g.map(col => col.filter(Boolean)), queue, reward: DAILY_REWARD };
+    dailyCache = { key, L };
+    return L;
+  }
+  function loadDaily() {
+    try { const d = JSON.parse(store.get(DAILY_KEY) || 'null'); if (d && d.won) return d; } catch (e) {}
+    return { won: {} };
+  }
+  // today's unfinished daily attempt, if there is one
+  function savedDaily() {
+    try {
+      const d = JSON.parse(store.get(DAILY_SAVE_KEY) || 'null');
+      return !!(d && d.lv && !d.lv.result && d.lv.day === todayKey());
+    } catch (e) { return false; }
+  }
+  function startDaily(day = todayKey()) { beginAttempt(dailyDef(day), 'daily', { n: 0, day }); }
+  function playDaily() {
+    if (levelish() && lv && !lv.result) save();
+    else if (mode === 'endless') save();
+    if (savedDaily() && load('daily') && lv && !lv.result) { mode = 'daily'; hideHome(); hideOverlay(); updateHud(); return; }
+    startDaily();
+  }
+
+  function dailyWon() {
+    const day = lv.day, stars = starsFor(), d = loadDaily();
+    const first = d.won[day] === undefined;
+    const reward = first ? DAILY_REWARD : Math.max(0, stars - d.won[day]) * 10;
+    d.won[day] = Math.max(stars, d.won[day] || 0);
+    store.set(DAILY_KEY, JSON.stringify(d));
+    store.del(DAILY_SAVE_KEY);
+    if (reward) { setCoins(coins + reward); launchCoins(reward); }
+    banner = { text: 'Daily complete!', life: 2 };
+    const total = Object.keys(d.won).length;
+    showOverlay(`
+      <div class="tag">Daily challenge · ${dayLabel(day)}</div>
+      <h2>Daily complete!</h2>
+      ${starHtml(stars)}
+      ${reward ? `<p><span class="coin"></span> <b>+${reward}</b> coins</p>` : '<p>Already claimed today. Replay for more stars!</p>'}
+      <p>📅 Dailies won: <b>${total}</b>. A new board arrives tomorrow.</p>
+      <button class="primary" id="homeBtn2">🏠 Home</button>
+      <button id="replayBtn">↻ Replay</button>`);
+    $('homeBtn2').onclick = showHome;
+    $('replayBtn').onclick = () => startDaily(day);
+  }
+  function dailyLost(why) {
+    save();
+    const canUndo = snap && coins - lastEarned >= priceOf('undo');
+    showOverlay(`
+      <div class="tag">Daily challenge · ${dayLabel(lv.day)}</div>
+      <h2>${why}</h2>
+      <p>${goalText(levelDef())}</p>
+      <button class="primary" id="retryBtn">↻ Try again</button>
+      ${canUndo ? `<button id="goUndo">↶ Undo last shot${priceOf('undo') ? ` <span class="coin"></span> ${COST.undo}` : ' (free)'}</button>` : ''}
+      <button id="homeBtn2">🏠 Home</button>`);
+    $('homeBtn2').onclick = showHome;
+    $('retryBtn').onclick = () => startDaily(lv.day);
+    if (canUndo) $('goUndo').onclick = undo;
+  }
+
+  // Sets up a level or daily attempt from its definition.
+  function beginAttempt(L, m, extra) {
+    mode = m;
     cols = L.cols; rows = L.rows;
     layout();
     const start = L.start || [];
@@ -1102,7 +1354,7 @@
       const col = start[c] || [];
       return Array.from({ length: rows }, (_, r) => col[r] || 0);
     }));
-    lv = { n, shots: L.shots, shotsLeft: L.shots, used: 0, qi: 0, bestCombo: 0, bestMerge: 0, result: null };
+    lv = { ...extra, shots: L.shots, shotsLeft: L.shots, used: 0, qi: 0, bestCombo: 0, bestMerge: 0, broken: 0, result: null };
     score = 0; minE = 1; oldStart = 0; over = false; busy = false;
     maxV = Math.max(2, ...allTiles().map(t => t.v));
     ghosts = []; floaters = []; flyers = []; bubbles = []; banner = null; praise = null;
@@ -1110,11 +1362,12 @@
     clearCoinFlights();
     bag = []; bagKey = ''; rescueUsed = true;
     freeUses = { hammer: 0, swap: 0, undo: 0, ...L.free };
-    const perks = L.noHelpers ? {} : streakPerks(loadProgress().streak);
+    const streaky = m === 'level' && !L.noHelpers;   // the win streak belongs to Levels
+    const perks = streaky ? streakPerks(loadProgress().streak) : {};
     for (const k in perks) freeUses[k] += perks[k];
-    levelPerks = L.noHelpers ? '' : perkText(loadProgress().streak);
+    levelPerks = streaky ? perkText(loadProgress().streak) : '';
     cur = rollValue(); nxt = rollValue(); nxt2 = rollValue();
-    gameId = 'L' + n + '-' + Date.now().toString(36);
+    gameId = (m === 'daily' ? 'D' + extra.day : 'L' + extra.n) + '-' + Date.now().toString(36);
     aim = L.hint !== undefined ? L.hint : Math.floor(cols / 2);
     resetShooter();
     save();
@@ -1127,9 +1380,11 @@
     const L = levelDef();
     const free = Object.entries(L.free || {}).map(([k, v]) => `${v} free ${k[0].toUpperCase() + k.slice(1)}${v > 1 ? 's' : ''}`);
     showOverlay(`
-      <div class="tag">Level ${lv.n}${L.hard ? ' · Hard' : ''} · ${L.cols}×${L.rows} board</div>
+      <div class="tag">${mode === 'daily' ? `Daily challenge · ${dayLabel(lv.day)}` : `Level ${lv.n}`}${lv.n > WORLDS[0].to ? ' · ' + worldOf(lv.n).name : ''}${L.hard ? ' · Hard' : ''} · ${L.cols}×${L.rows} board</div>
       <h2 class="goal">${goalText(L)}</h2>
       ${L.intro ? `<p>${L.intro}</p>` : ''}
+      ${mode === 'daily' ? `<p>Today's board is the same for every player.${loadDaily().won[lv.day] === undefined ? ` First win pays <span class="coin"></span> <b>${DAILY_REWARD}</b>.` : ' Already won today: play for stars.'}</p>` : ''}
+      ${L.stoneEvery ? `<p>🪨 A stone rolls in every <b>${L.stoneEvery}</b> shots.</p>` : ''}
       ${levelPerks ? `<p class="streak">🔥 Win streak bonus: ${levelPerks}</p>` : ''}
       <p>${L.shots ? `<b>${L.shots}</b> shots` : 'No shot limit'}${free.length ? ' · ' + free.join(', ') : ''}</p>
       <button class="primary" id="playBtn">Play</button>`);
@@ -1164,6 +1419,7 @@
   function levelWon() {
     over = true; tool = null; sel = null; snap = null;
     lv.result = 'won';
+    if (mode === 'daily') return dailyWon();
     const L = levelDef(), n = lv.n, stars = starsFor();
     const pr = loadProgress(), prev = pr.stars[n];
     // full reward the first time it's cleared (a skipped level counts as not cleared);
@@ -1185,17 +1441,19 @@
       setCoins(coins + chest.coins);
       chestHeld = chest.coins; coinPending += chestHeld; updateHud();
     }
-    banner = { text: n === LEVELS.length ? 'You graduated!' : 'Level complete!', life: 2 };
-    const last = n === LEVELS.length;
+    const last = n === LEVELS.length, grad = !!L.grad, finale = n === worldOf(n).to;
+    const nextWorld = finale && !last ? worldOf(n + 1).name : '';
+    banner = { text: grad ? 'You graduated!' : finale ? 'World complete!' : 'Level complete!', life: 2 };
     showOverlay(`
       <div class="tag">Level ${n}</div>
-      <h2>${last ? '🎓 You graduated!' : 'Level complete!'}</h2>
+      <h2>${grad ? '🎓 You graduated!' : finale ? `🏆 ${worldOf(n).name} cleared!` : 'Level complete!'}</h2>
       ${starHtml(stars)}
       ${reward ? `<p><span class="coin"></span> <b>+${reward}</b> coins</p>` : '<p>Replay for more stars!</p>'}
       ${firstClear && !last ? `<p class="streak">${streakLine(pr.streak)}</p>` : ''}
       ${chest ? `<button class="chest" id="chestBtn" aria-label="Open the chest">🎁</button><p id="chestTxt">Checkpoint chest! Tap to open.</p>` : ''}
-      ${last ? '<p>You\'ve mastered every idea. Endless mode is the real test — see how far you get!</p>' : ''}
-      ${last ? '<button class="primary" id="endlessBtn">∞ Play Endless</button>' : '<button class="primary" id="nextBtn">Next level</button>'}
+      ${nextWorld ? `<p>A new world is open: <b>${nextWorld}</b>. Endless is unlocked too, whenever you want it.</p>` : ''}
+      ${last ? '<p>You\'ve cleared every world. Endless mode is the real test — see how far you get!</p>' : ''}
+      ${last ? '<button class="primary" id="endlessBtn">∞ Play Endless</button>' : `<button class="primary" id="nextBtn">${nextWorld ? `Enter ${nextWorld}` : 'Next level'}</button>`}
       <div class="row"><button id="replayBtn">↻ Replay</button><button id="mapBtn">🗺️ Map</button><button id="homeBtn2">🏠</button></div>`);
     if (last) $('endlessBtn').onclick = playEndless;
     else $('nextBtn').onclick = () => startLevel(n + 1);
@@ -1215,6 +1473,7 @@
   function levelLost(why) {
     over = true; tool = null; sel = null;
     lv.result = 'lost';
+    if (mode === 'daily') return dailyLost(why);
     const n = lv.n, pr = loadProgress();
     pr.fails[n] = (pr.fails[n] || 0) + 1;
     const dropped = !pr.cleared[n] && !lv.streakHit && pr.streak > 0;
@@ -1245,23 +1504,32 @@
     releaseChest(false);
     const pr = loadProgress();
     const next = LEVELS.findIndex((_, i) => pr.stars[i + 1] === undefined) + 1;
-    const cells = LEVELS.map((L, i) => {
-      const n = i + 1, open = unlocked(n, pr), st = pr.stars[n];
+    const cell = n => {
+      const L = LEVELS[n - 1], open = unlocked(n, pr), st = pr.stars[n];
       const cls = ['lv', n === next ? 'next' : '', L.hard ? 'hard' : ''].join(' ');
-      const label = n === LEVELS.length ? '🎓' : L.chest && !pr.cleared[n] ? '🎁' : open ? n : '🔒';
+      const label = L.grad ? '🎓' : n === LEVELS.length ? '🏆' : L.chest && !pr.cleared[n] ? '🎁' : open ? n : '🔒';
       return `<button class="${cls}" data-n="${n}" ${open ? '' : 'disabled'}>${label}<span class="st">${st === undefined ? '' : '★'.repeat(st) || '–'}</span></button>`;
+    };
+    const worlds = WORLDS.map((w, i) => {
+      let html = '', got = 0;
+      for (let n = w.from; n <= w.to; n++) { html += cell(n); got += pr.stars[n] || 0; }
+      const locked = !unlocked(w.from, pr);
+      return `<div class="world${locked ? ' locked' : ''}" id="world${i + 1}"><h3>World ${i + 1}: ${w.name}<span>${locked ? '🔒' : `★ ${got}/${(w.to - w.from + 1) * 3}`}</span></h3>
+        <div class="lv-grid">${html}</div></div>`;
     }).join('');
     showOverlay(`
       <h2>🗺️ Levels</h2>
       <p>★ ${totalStars(pr)} / ${LEVELS.length * 3}</p>
-      <div class="lv-grid">${cells}</div>
+      <div class="worlds">${worlds}</div>
       <button id="closeBtn">Close</button>`);
     for (const b of document.querySelectorAll('.lv[data-n]')) b.onclick = () => startLevel(+b.dataset.n);
     $('closeBtn').onclick = hideOverlay;
+    const here = $('world' + (WORLDS.indexOf(worldOf(next || 1)) + 1));
+    if (here && here.offsetTop > 0) here.scrollIntoView({ block: 'nearest' });
   }
 
   function playEndless() {
-    if (mode === 'level' && lv && !lv.result) save();   // keep the level attempt for later
+    if (levelish() && lv && !lv.result) save();   // keep the level attempt for later
     hideHome();
     mode = 'endless';
     if (!load('endless')) newGame();
@@ -1304,6 +1572,8 @@
   }
 
   const ICONS = {
+    cal: `<svg class="mi" viewBox="0 0 48 48"><rect x="5" y="9" width="38" height="34" rx="7" fill="#fff" stroke="#c2410c" stroke-width="2.5"/><path d="M5 16a7 7 0 0 1 7-7h24a7 7 0 0 1 7 7v4H5z" fill="#ef4444"/><rect x="13" y="4" width="5" height="10" rx="2.5" fill="#7c2d12"/><rect x="30" y="4" width="5" height="10" rx="2.5" fill="#7c2d12"/><path d="M15 31l6 6 12-12" stroke="#22c55e" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    shop: `<svg viewBox="0 0 48 48"><path d="M24 5C12 5 4 13 4 23c0 9 7 15 14 15 3 0 4-2 4-4s-1-3-1-5 2-3 4-3h6c7 0 13-4 13-11C44 10 35 5 24 5z" fill="#fde68a" stroke="#b45309" stroke-width="2.5"/><circle cx="14" cy="21" r="4" fill="#ef4444"/><circle cx="20" cy="12" r="4" fill="#3b82f6"/><circle cx="31" cy="12" r="4" fill="#22c55e"/><circle cx="37" cy="21" r="4" fill="#a855f7"/></svg>`,
     coin: `<svg class="ico" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#e09a10"/><circle cx="16" cy="15" r="13" fill="#ffd23f"/><circle cx="16" cy="15" r="9" fill="#ffc21a" stroke="#e8a40e" stroke-width="2"/><path d="M11 11a7 7 0 0 1 6-3" stroke="#fff3b0" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>`,
     star: `<svg class="ico" viewBox="0 0 32 32"><path d="M16 2l4.2 8.6 9.4 1.4-6.8 6.6 1.6 9.4L16 23.6 7.6 28l1.6-9.4L2.4 12l9.4-1.4z" fill="#ffc21a" stroke="#d98a00" stroke-width="2" stroke-linejoin="round"/><path d="M16 7l2.5 5.2 4 .6" stroke="#fff3b0" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`,
     fire: `<svg class="ico" viewBox="0 0 32 32"><path d="M16 3c2 6 9 8 9 16a9 9 0 0 1-18 0c0-5 3-7 4-10 1 3 2 4 3 4 0-4 0-7 2-10z" fill="#ff7a1a"/><path d="M16 14c1 3 5 5 5 9a5 5 0 0 1-10 0c0-3 2-4 3-6 0 2 1 3 2 3 0-2 0-4 0-6z" fill="#ffd23f"/></svg>`,
@@ -1396,7 +1666,7 @@
     if (busy) return;
     clearCoinFlights();               // coins are already saved; skip the fly-in
     tool = null; sel = null;
-    if (mode === 'level' && lv && !lv.result) save();  // keep the attempt to continue
+    if (levelish() && lv && !lv.result) save();  // keep the attempt to continue
     hideOverlay();
     const pr = loadProgress();
     const cleared = Object.keys(pr.cleared).length;
@@ -1427,20 +1697,33 @@
         <button class="mcard m-lv" id="hMap">${ICONS.trophy}<span class="mt"><b>Levels</b><small>${cleared}/${LEVELS.length} cleared</small></span><span class="chev">›</span></button>
         <button class="mcard m-en" id="hEndless">${ICONS.inf}<span class="mt"><b>Endless</b><small>Best: ${shortScore(best)}</small></span><span class="chev">›</span></button>
       </div>
+      ${dailyCard()}
       <div class="dock">
         <button id="hMiles">${ICONS.medal}Milestones</button>
         <button id="hBoard">${ICONS.chart}Scores</button>
+        <button id="hShop">${ICONS.shop}Skins</button>
         <button id="hHelp">${ICONS.book}Help</button>
       </div>`;
     $('home').classList.add('show');
     $('hPlay').onclick = () => (cont ? resumeLevel() : next ? startLevel(next) : playEndless());
     $('hMap').onclick = showMap;
     $('hEndless').onclick = playEndless;
+    $('hDaily').onclick = playDaily;
     $('hMiles').onclick = showMilestones;
     $('hBoard').onclick = showScoreboard;
     $('hHelp').onclick = showHelp;
+    $('hShop').onclick = showShop;
     $('hCoins').onclick = showEarnCoins;
     $('hGear').onclick = showSettings;
+  }
+
+  function dailyCard() {
+    const day = todayKey(), won = loadDaily().won[day], L = dailyDef(day);
+    const sub = won !== undefined ? `Done ${'★'.repeat(won)}${'☆'.repeat(3 - won)} · new board tomorrow`
+      : savedDaily() ? 'Continue today\'s board'
+      : `${goalText(L).replace(/<[^>]+>/g, '')} · +${DAILY_REWARD} coins`;
+    return `<button class="dcard${won !== undefined ? ' done' : ''}" id="hDaily">${ICONS.cal}<span class="mt"><b>Daily Challenge</b><small>${sub}</small></span>
+      <span class="badge">${won !== undefined ? '✓' : 'NEW'}</span></button>`;
   }
 
   function showEarnCoins() {
@@ -1449,12 +1732,48 @@
       <ul>
         <li>Combos: 2+ merges in one shot.</li>
         <li>Clearing a level for the first time, and new stars after that.</li>
-        <li>🎁 Chests on levels 10 and 20.</li>
+        <li>🎁 Chests on levels 10, 20, 30 and 36.</li>
         <li>🏅 Milestones: your first 2048, 4K, 4M and ∞.</li>
+        <li>📅 The daily challenge: ${DAILY_REWARD} for each day's first win.</li>
         <li>Every ∞ block you make in Endless.</li>
       </ul>
       <button class="primary" id="closeBtn">Got it</button>`);
     $('closeBtn').onclick = hideOverlay;
+  }
+
+  // ---------- skins shop ----------
+  function showShop() {
+    const d = loadSkins();
+    const swatch = k => [0, 1, 2, 3].map(i => {
+      const c = k.pal[i];
+      return `<i style="background:linear-gradient(${shade(c, 0.16)},${shade(c, -0.06)});box-shadow:0 3px 0 ${shade(c, -0.42)}">${2 << i}</i>`;
+    }).join('');
+    const items = SKINS.map(k => {
+      const own = d.owned.includes(k.id), on = d.on === k.id;
+      const btn = on ? '<button disabled>In use</button>'
+        : own ? `<button data-use="${k.id}">Use</button>`
+        : `<button class="primary" data-buy="${k.id}" ${coins < k.price ? 'disabled' : ''}><span class="coin"></span> ${k.price.toLocaleString()}</button>`;
+      return `<div class="skin${on ? ' on' : ''}"><div class="sw" style="background:${k.board[0]}">${swatch(k)}</div><b>${k.name}</b>${btn}</div>`;
+    }).join('');
+    showOverlay(`
+      <h2>🎨 Skins</h2>
+      <p>New colours for every block and the board. <span class="coin"></span> <b>${coins.toLocaleString()}</b></p>
+      <div class="skins">${items}</div>
+      <button id="closeBtn">Close</button>`);
+    for (const b of document.querySelectorAll('[data-use]')) b.onclick = () => {
+      const s = loadSkins(); s.on = b.dataset.use; store.set(SKIN_KEY, JSON.stringify(s));
+      applySkin(s.on); showShop();
+    };
+    for (const b of document.querySelectorAll('[data-buy]')) b.onclick = () => {
+      const k = SKINS.find(x => x.id === b.dataset.buy), s = loadSkins();
+      if (!k || coins < k.price || s.owned.includes(k.id)) return;
+      setCoins(coins - k.price);
+      s.owned.push(k.id); s.on = k.id; store.set(SKIN_KEY, JSON.stringify(s));
+      applySkin(k.id);
+      toast(`🎨 ${k.name} unlocked!`);
+      showShop();
+    };
+    $('closeBtn').onclick = () => { hideOverlay(); if (homeOpen()) showHome(); };
   }
 
   function showSettings() {
@@ -1466,7 +1785,7 @@
       <button id="sReset">Reset all progress…</button>
       <button class="primary" id="closeBtn">Close</button>`);
     if (cont) $('sRestartLv').onclick = () => startLevel(cont);
-    if (hasEndless) $('sNewEndless').onclick = () => { if (mode === 'level') save(); newGame(); };
+    if (hasEndless) $('sNewEndless').onclick = () => { if (levelish()) save(); newGame(); };
     $('sReset').onclick = () => {
       showOverlay(`
         <h2>Reset everything?</h2>
@@ -1484,7 +1803,7 @@
   function hideHome() { $('home').classList.remove('show'); }
 
   function resumeLevel() {
-    if (mode === 'endless') save();     // keep the Endless run
+    if (mode !== 'level') save();       // keep the Endless run or daily attempt
     if (!load('level') || !lv || lv.result) { startLevel(savedLevel() || 1); return; }
     hideHome(); hideOverlay();
     updateHud();
@@ -1570,15 +1889,21 @@
     updateHud();
 
     await sleep(dur * 1000 + (full ? 0 : 60));
-    let combo = 0;
+    let combo = 0, focus = [[c, r]];
     if (full) {
       flyers = flyers.filter(f => f !== t);
       const target = grid[c][r];
       await bubbleMerge(target, [t], target.v * 2);
       addScore(target.v, c, r);
       combo = 1;
+      if (hitStones([[c, r]])) {
+        await sleep(160);
+        const moved = compact();
+        focus = [find(target) || [c, r], ...moved];
+        if (moved.length) await sleep(200);
+      }
     }
-    combo += await resolve([[c, r]]);
+    combo += await resolve(focus);
     rewardCombo(combo);
     if (mode === 'endless') tierCheck();
     else lv.bestCombo = Math.max(lv.bestCombo, combo);
@@ -1592,7 +1917,14 @@
     if (!launchable(cur)) { cur = rollValue(); shooter.v = cur; shooter.s = 0.6; }
     if (!launchable(nxt)) nxt = rollValue();
     if (!launchable(nxt2)) nxt2 = rollValue();
-    if (mode === 'level' && levelEnded()) { updateHud(); return; }
+    if (levelish()) {
+      const every = levelDef().stoneEvery;
+      if (every && lv.used && lv.used % every === 0 && lv.dropAt !== lv.used && !goalMet()) {
+        lv.dropAt = lv.used;
+        dropStone();
+      }
+      if (levelEnded()) { updateHud(); return; }
+    }
     if (isStuck()) gameOver();     // gameOver saves too
     else save();
     updateHud();
@@ -1615,6 +1947,7 @@
 
       const [hc, hr] = hit;
       const ns = eqNeighbors(hc, hr);
+      const mergeCells = [[hc, hr], ...ns];
       // Merge into the block above when there is one: after the column settles the
       // result lands in the same cell either way, but visually the lower bubble
       // rises into the upper one instead of the upper being dragged down.
@@ -1630,6 +1963,7 @@
       if (infPair) clearInfinity(t, tp);
       else addScore(t.v, tp[0], tp[1]);
       await sleep(srcs.length === 1 ? 100 : 130);
+      if (hitStones(mergeCells)) await sleep(160);
 
       const moved = compact();
       const pos = find(t);
@@ -1650,7 +1984,7 @@
   }
 
   // Free: trade the current tile with the next one.
-  const helpersOff = () => mode === 'level' && levelDef().noHelpers;
+  const helpersOff = () => levelish() && levelDef().noHelpers;
   function swap() {
     if (busy || over || tool || helpersOff()) return;
     [cur, nxt] = [nxt, cur];
@@ -1683,8 +2017,9 @@
       fadeGhost(t, cell * 0.5);
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * Math.PI * 2;
-        floaters.push({ text: '✦', x: t.x + cell / 2, y: t.y + cell / 2, vx: Math.cos(a) * cell * 2, vy: Math.sin(a) * cell * 2, life: 0.6, color: colorOf(t.v) });
+        floaters.push({ text: '✦', x: t.x + cell / 2, y: t.y + cell / 2, vx: Math.cos(a) * cell * 2, vy: Math.sin(a) * cell * 2, life: 0.6, color: t.v < 0 ? '#d9d0c4' : colorOf(t.v) });
       }
+      if (t.v < 0 && lv) lv.broken = (lv.broken || 0) + 1;
       grid[c][r] = null;
       updateHud();
       await sleep(180);
@@ -1804,7 +2139,7 @@
   }
 
   function gameOver() {
-    if (mode === 'level') return levelLost('No room left');
+    if (levelish()) return levelLost('No room left');
     over = true;
     tool = null; sel = null;
     save();
@@ -1878,9 +2213,12 @@
         <li>Merge past 2048M to make an <b>∞ block</b> — the ultimate tile. Each new ∞ pays 500 coins, and two ∞ that touch clear away for 250 more. Your ∞ count is shown at the top.</li>
         <li>Stuck? Once per game you get a free Hammer to dig yourself out.</li>
         <li>Game ends when neither tile can be placed.</li>
-        <li><b>🏠 Home</b> → Levels: 24 levels on growing boards, each with a goal and a shot limit. Earn up to 3 stars per level.</li>
+        <li><b>🏠 Home</b> → Levels: ${LEVELS.length} levels in ${WORLDS.length} worlds, each with a goal and a shot limit. Earn up to 3 stars per level.</li>
+        <li>🪨 <b>Stones</b> (World 2) never merge. A merge next to a stone cracks it; a second one breaks it. A Hammer smashes one outright.</li>
+        <li>📅 <b>Daily challenge</b>: a new board every day, the same for everyone. The first win each day pays ${DAILY_REWARD} coins.</li>
+        <li>🎨 <b>Skins</b>: spend coins on new colours for the blocks and board.</li>
         <li>Win new levels in a row to build a 🔥 <b>streak</b>: at 3 you start levels with a free Hammer, at 5 a free Swap too. A loss only knocks it down 2.</li>
-        <li>Levels 10 and 20 hold a 🎁 <b>chest</b>, and your first 2048, 4K, 4M and ∞ each pay a one-time 🏅 <b>bounty</b>.</li>
+        <li>Levels 10, 20, 30 and 36 hold a 🎁 <b>chest</b>, and your first 2048, 4K, 4M and ∞ each pay a one-time 🏅 <b>bounty</b>.</li>
       </ul>
       <div class="row"><button id="boardBtn">🏆 Scoreboard</button><button class="primary" id="closeBtn">Got it</button></div>`);
     $('closeBtn').onclick = hideOverlay;
@@ -1934,8 +2272,48 @@
     return { bg: `linear-gradient(180deg, ${st.top}, ${st.bot})`, fg: st.inf ? '#fde68a' : '#fff', border };
   }
 
+  // A grey boulder block with pebbles; a cracked one shows a jagged split.
+  function drawStone(v, x, y, sx, sy, alpha) {
+    const pad = cell * 0.035;
+    const w = (cell - pad * 2) * Math.max(0.05, sx), h = (cell - pad * 2) * Math.max(0.05, sy);
+    const cx = x + cell / 2, cy = y + cell / 2, left = cx - w / 2, top = cy - h / 2;
+    const lip = h * 0.11, rad = Math.min(w, h) * 0.2;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    rr(left, top, w, h, rad);
+    ctx.fillStyle = '#4b4350';
+    ctx.fill();
+    const g = ctx.createLinearGradient(0, top, 0, top + h - lip);
+    g.addColorStop(0, v === CRACKED ? '#a79c90' : '#b9afa2');
+    g.addColorStop(1, v === CRACKED ? '#7c7268' : '#8a8076');
+    rr(left, top, w, h - lip, rad);
+    ctx.fillStyle = g;
+    ctx.fill();
+    rr(left + w * 0.08, top + h * 0.06, w * 0.84, (h - lip) * 0.3, rad * 0.8);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fill();
+    ctx.fillStyle = 'rgba(70,60,66,0.35)';      // pebbles
+    for (const [px, py, pr] of [[0.28, 0.62, 0.07], [0.7, 0.36, 0.06], [0.62, 0.7, 0.045], [0.36, 0.3, 0.04]]) {
+      ctx.beginPath(); ctx.arc(left + w * px, top + (h - lip) * py, Math.min(w, h) * pr, 0, Math.PI * 2); ctx.fill();
+    }
+    if (v === CRACKED) {
+      ctx.strokeStyle = '#2b2430';
+      ctx.lineWidth = Math.max(1.5, cell * 0.04);
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.beginPath();
+      const P = (px, py) => [left + w * px, top + (h - lip) * py];
+      ctx.moveTo(...P(0.48, 0.02)); ctx.lineTo(...P(0.4, 0.3)); ctx.lineTo(...P(0.56, 0.48));
+      ctx.lineTo(...P(0.44, 0.72)); ctx.lineTo(...P(0.52, 0.98));
+      ctx.moveTo(...P(0.56, 0.48)); ctx.lineTo(...P(0.82, 0.58));
+      ctx.moveTo(...P(0.4, 0.3)); ctx.lineTo(...P(0.18, 0.22));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   let nowMs = 0;
   function drawTile(v, x, y, sx, sy, alpha, round = 0, noText = false) {
+    if (v < 0) { drawStone(v, x, y, sx, sy, alpha); return; }
     const st = tileStyle(v);
     const pad = cell * 0.035;
     const w = (cell - pad * 2) * Math.max(0.05, sx), h = (cell - pad * 2) * Math.max(0.05, sy);
@@ -2090,14 +2468,14 @@
 
     // board background and lanes
     rr(bx - 6, by - 6, cell * cols + 12, cell * rows + 12, 16);
-    ctx.fillStyle = '#1b1830';
+    ctx.fillStyle = skin.board[0];
     ctx.fill();
     for (let c = 0; c < cols; c++) {
       let off = 0;
       if (shake && shake.c === c) off = Math.sin(shake.t * 60) * 5 * (shake.t / 0.35);
       const n = count(c);
       ctx.fillStyle = n >= rows - 1 && rows >= 5 ? '#3a2335'   // nearly-full warning on taller boards
-        : c === aim && !over && !tool ? '#2d2948' : '#26223d';
+        : c === aim && !over && !tool ? skin.board[2] : skin.board[1];
       rr(cellX(c) + 2 + off, by, cell - 4, cell * rows, 10);
       ctx.fill();
     }
@@ -2208,7 +2586,7 @@
       drawT(shooter);
     }
     // tutorial hand: points at the column to shoot on a level's first move
-    if (mode === 'level' && lv && lv.used === 0 && levelDef().hint !== undefined && !over &&
+    if (levelish() && lv && lv.used === 0 && levelDef().hint !== undefined && !over &&
         !$('overlay').classList.contains('show')) {
       const hx = cellX(levelDef().hint) + cell / 2, bob = Math.sin(now / 220) * cell * 0.08;
       ctx.save();
@@ -2334,6 +2712,7 @@
       if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') {
         e.preventDefault();
         if (!over) hideOverlay();
+        else if (mode === 'daily') startDaily();
         else if (mode === 'level') startLevel(lv.result === 'won' && lv.n < LEVELS.length ? lv.n + 1 : lv.n);
         else newGame();
       }
@@ -2349,7 +2728,7 @@
     else if (k === 'arrowright' || k === 'd') { if (!busy) aim = Math.min(cols - 1, aim + 1); }
     else if (k === ' ' || k === 'arrowup' || k === 'enter' || k === 'w') { e.preventDefault(); fire(aim); }
     else if (k === 's' || k === 'arrowdown') { e.preventDefault(); swap(); }
-    else if (k === 'n') mode === 'level' ? startLevel(lv.n) : newGame();
+    else if (k === 'n') mode === 'daily' ? startDaily() : mode === 'level' ? startLevel(lv.n) : newGame();
     else if (k === 'm') showHome();
     else if (/^[1-9]$/.test(k) && +k <= cols) fire(+k - 1);
   });
@@ -2360,7 +2739,7 @@
   $('tUndo').onclick = undo;
   $('homeBtn').onclick = showHome;
   $('helpBtn').onclick = showHelp;
-  $('bestBox').onclick = () => (mode === 'level' ? showMap() : showScoreboard());
+  $('bestBox').onclick = () => (mode === 'level' ? showMap() : mode === 'daily' ? null : showScoreboard());
   $('overlay').addEventListener('click', e => { if (e.target.id === 'overlay' && !over) hideOverlay(); });
 
   // Re-measure whenever the play area changes size (rotation, entering full
@@ -2402,7 +2781,7 @@
   // exposed for automated testing only
   window.__mb = {
     fire, swap, newGame, undo, toggleTool, useToolAt, comboCoins, rollValue, startLevel, showMap, playEndless, LEVELS,
-    showHome, resumeLevel, showMilestones,
+    showHome, resumeLevel, showMilestones, startDaily, dailyDef, todayKey, playDaily, showShop, applySkin,
     setCoins,
     state: () => ({ grid: gridValues(), cur, nxt, nxt2, score, over, busy, coins, tool, sel, snap: !!snap, maxV, infCount, minE, mode, lv, cols, rows, freeUses, inv: { ...inv } }),
   };

@@ -7,7 +7,7 @@ Build a level mode on the existing engine first, with small boards that grow fro
 | Now | Endless quick wins: bag randomiser, ∞ pays coins, two-tile preview, free rescue *(done)* | none |
 | 1 | **Level mode MVP** *(built, now in playtesting)*: variable board size, 24 teaching levels, goals + shot limits + 1–3 stars, level map, free helper samples | Bot wins levels 1–6 every time; a new player finishes 1–12 without help |
 | 2 | **Rewards** *(built)*: win-streak ladder (3 wins → free Hammer, 5 → + free Swap; a loss costs 2 steps), chests on levels 10 and 20 (coins + banked helpers), one-time bounties for the first 2048 / 4K / 4M / ∞, and a home screen to pick a mode | Players replay levels for 3 stars |
-| 3 | Variety: one new blocker per world, daily challenge, skins as coin sinks | New worlds still feel fresh |
+| 3 | **Variety** *(built, now in playtesting)*: World 2 "Stone Quarry" (levels 25–36) with stone blockers, a seeded daily challenge, and 4 tile/board skins as coin sinks | New worlds still feel fresh |
 | 4 | Story: spend stars to restore an illustrated scene, one caption at a time | none |
 | 5 | **Store release (final polish)**: swap in the real art, monetisation, Android and iOS builds, store listings | Closed testing passes; both stores approve |
 

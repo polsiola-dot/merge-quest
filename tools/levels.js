@@ -1,7 +1,8 @@
 // Level bot: plays every level N times and reports win rate, average stars and shots used.
-// Usage: node tools/levels.js [attempts=30] [firstLevel=1] [lastLevel=24]
+// Usage: node tools/levels.js [attempts=30] [firstLevel=1] [lastLevel=all]
 const path = require('path');
 const { chromium } = require('playwright');
+const { playAttempt } = require('./bot');
 
 (async () => {
   const tries = +process.argv[2] || 30, from = +process.argv[3] || 1;
@@ -18,32 +19,7 @@ const { chromium } = require('playwright');
     let wins = 0, stars = 0, shotsUsed = 0; const fin = [];
     for (let a = 0; a < tries; a++) {
       await page.evaluate(n => { window.__mb.setCoins(0); window.__mb.startLevel(n); }, n);
-      for (let m = 0; m < 400; m++) {
-        const s = await page.evaluate(() => window.__mb.state());
-        if (s.lv.result) break;
-        const cols = s.cols, rows = s.rows;
-        let best = -1, bestScore = -1e9;
-        for (let c = 0; c < cols; c++) {
-          const col = s.grid[c], k = col.filter(Boolean).length;
-          let sc = -k * 0.5;
-          if (k === rows) sc = col[rows - 1] === s.cur ? 30 : -1e9;
-          else {
-            if (k && col[k - 1] === s.cur) sc += 20;
-            if (c > 0 && s.grid[c - 1][k] === s.cur) sc += 15;
-            if (c < cols - 1 && s.grid[c + 1][k] === s.cur) sc += 15;
-            if (k && col[k - 1] < s.cur) sc -= 4;
-          }
-          sc += Math.random();
-          if (sc > bestScore) { bestScore = sc; best = c; }
-        }
-        if (bestScore < -1e8) {
-          const sw = await page.evaluate(() => { const before = window.__mb.state().cur; window.__mb.swap(); return window.__mb.state().cur !== before; });
-          if (!sw) break;
-          continue;
-        }
-        await page.evaluate(c => window.__mb.fire(c), best);
-        await page.waitForFunction(() => !window.__mb.state().busy);
-      }
+      await playAttempt(page);
       const s = await page.evaluate(() => window.__mb.state());
       fin.push({ score: s.score, maxV: s.maxV, combo: s.lv.bestCombo, merge: s.lv.bestMerge, used: s.lv.used, tiles: s.grid.flat().filter(Boolean).length });
       if (s.lv.result === 'won') {

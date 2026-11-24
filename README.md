@@ -2,12 +2,15 @@
 
 Number merge and game quest mash-up. Shoot numbered tiles up into columns; equal tiles that touch merge and double, chains make combos, and combos earn coins for helpers (Swap, Hammer, Undo).
 
-Two modes, picked on the **home screen** (🏠 at the top left of the game returns there):
+Three modes, picked on the **home screen** (🏠 at the top left of the game returns there):
 
-- **Levels**: 24 levels whose board grows from 2×2 to 5×7, teaching one idea at a time. Each level has a goal (make a tile, reach a score, make a combo, merge 3 or 4 at once, thin the board out, or survive), a shot limit and up to 3 stars. Levels 1–6 are scripted tutorials. New players start here.
+- **Levels**: 36 levels in two worlds. **World 1: Basics** (1–24) grows the board from 2×2 to 5×7, teaching one idea at a time. **World 2: Stone Quarry** (25–36) adds 🪨 stones: blocks that never merge, crack when a merge happens next to them and break on the second hit (or to a Hammer). Some quarry levels roll a new stone in every few shots. Each level has a goal (make a tile, reach a score, make a combo, merge 3 or 4 at once, thin the board out, survive, or break stones), a shot limit and up to 3 stars. Levels 1–6 are scripted tutorials. New players start here.
+- **Daily challenge**: one board a day, the same for every player (the date seeds the board and the tile queue). The goal type rotates through seven kinds. The first win each day pays 150 coins; there's no daily streak to lose.
 - **Endless**: the original Merge Blaster game, with K/M tiers, ∞ blocks and the scoreboard.
 
-Rewards: a 🔥 win streak (3 new levels in a row → start with a free Hammer, 5 → a free Swap too; a loss only drops it by 2), 🎁 chests on levels 10 and 20, and 🏅 one-time bounties for your first 2048, 4K, 4M and ∞.
+Rewards: a 🔥 win streak (3 new levels in a row → start with a free Hammer, 5 → a free Swap too; a loss only drops it by 2), 🎁 chests on levels 10, 20, 30 and 36, and 🏅 one-time bounties for your first 2048, 4K, 4M and ∞.
+
+Coin sink: 🎨 **Skins** (home screen) recolour every block and the board: Candy 500, Ocean 750, Neon 1,000, Royal 1,500.
 
 See [docs/roadmap.md](docs/roadmap.md) for what's next.
 
@@ -52,10 +55,11 @@ Accounts: Google Play Console ($25 one-off) and Apple Developer Program ($99 a y
 
 ## Test bots
 
-Both need Playwright and run headless Chromium.
+All need Playwright and run headless Chromium. `tools/bot.js` is the shared greedy player.
 
 - `node tools/sim.js [games] [maxMoves]` plays Endless games and reports moves, score, biggest tile, coins and any page errors.
 - `node tools/levels.js [attempts] [first] [last]` plays each level many times and reports its win rate plus what the bot typically reaches (score, biggest tile, combo). Level goals were tuned so this simple greedy bot wins roughly 20–70% of random levels (a person planning ahead does better). Levels 1–6 must stay at 100%.
+- `node tools/daily.js [attempts] [days] [startDate]` plays the daily challenge for a run of days and reports each day's goal and win rate, plus an average per goal type (tuned to about 50–75%).
 
 ## Project layout
 
@@ -64,7 +68,7 @@ Both need Playwright and run headless Chromium.
 | `index.html` | The whole game: HTML, CSS and JavaScript |
 | `sw.js`, `manifest.webmanifest`, icons | Offline support and install-as-app |
 | `.github/workflows/pages.yml`, `_headers`, `netlify.toml` | Hosting settings (GitHub Pages, Netlify) |
-| `tools/sim.js`, `tools/levels.js` | Balance-testing bots (Endless, Levels) |
+| `tools/sim.js`, `tools/levels.js`, `tools/daily.js`, `tools/bot.js` | Balance-testing bots (Endless, Levels, Daily) and their shared player |
 | `docs/roadmap.md` | Plan and design rules |
 | `docs/art-prompts.md` | Image prompts for the final artwork |
 | `fonts/` | Bundled Fredoka and Lilita One fonts |
