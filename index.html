@@ -632,6 +632,25 @@
     return out;
   }
 
+  // Every block connected to (c, r) through equal-valued neighbours, as [col, row]
+  // pairs starting with (c, r). A merge takes the whole group, not just the
+  // neighbours of one block, so four 32s in a line all merge together.
+  function groupOf(c, r) {
+    const v = grid[c][r] && grid[c][r].v;
+    if (!(v > 0)) return [];
+    const seen = new Set([c * rows + r]), out = [[c, r]];
+    for (let i = 0; i < out.length; i++) {
+      const [qc, qr] = out[i];
+      for (const [dc, dr] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+        const nc = qc + dc, nr = qr + dr;
+        if (nc < 0 || nc >= cols || nr < 0 || nr >= rows || seen.has(nc * rows + nr)) continue;
+        const o = grid[nc][nr];
+        if (o && o.v === v) { seen.add(nc * rows + nr); out.push([nc, nr]); }
+      }
+    }
+    return out;
+  }
+
   // Pushes every column's tiles up to the ceiling. Returns positions of tiles that moved.
   function compact() {
     const moved = [];
@@ -1946,20 +1965,21 @@
       if (!hit) return merges;
 
       const [hc, hr] = hit;
-      const ns = eqNeighbors(hc, hr);
-      const mergeCells = [[hc, hr], ...ns];
-      // Merge into the block above when there is one: after the column settles the
-      // result lands in the same cell either way, but visually the lower bubble
-      // rises into the upper one instead of the upper being dragged down.
-      let t = grid[hc][hr];
-      const up = ns.findIndex(([nc, nr]) => nc === hc && nr === hr - 1);
-      if (up >= 0) { const above = grid[hc][hr - 1]; ns[up] = [hc, hr]; t = above; }
+      const mergeCells = groupOf(hc, hr);        // the whole connected group of equal blocks
+      // Merge into the topmost block of the group in the landing column: after the
+      // column settles the result lands in the same cell either way, but visually the
+      // lower bubbles rise into the upper one instead of it being dragged down.
+      let tr = hr;
+      for (const [gc, gr] of mergeCells) if (gc === hc && gr < tr) tr = gr;
+      const t = grid[hc][tr];
+      const ns = mergeCells.filter(([gc, gr]) => !(gc === hc && gr === tr))
+        .sort((a, b) => (Math.abs(a[0] - hc) + Math.abs(a[1] - tr)) - (Math.abs(b[0] - hc) + Math.abs(b[1] - tr)));
       const srcs = ns.map(([nc, nr]) => { const o = grid[nc][nr]; grid[nc][nr] = null; return o; });
       merges += ns.length;                       // a 3-way merge counts as 2, a 4-way as 3
       if (lv) lv.bestMerge = Math.max(lv.bestMerge, ns.length + 1);
       const infPair = t.v >= INF;                // ∞ + ∞: both clear away for a bonus
-      await bubbleMerge(t, srcs, t.v * Math.pow(2, ns.length)); // ×2, ×4 or ×8
-      const tp = find(t) || [hc, hr];
+      await bubbleMerge(t, srcs, t.v * Math.pow(2, ns.length)); // ×2, ×4, ×8, ×16 ... (doubles per extra block)
+      const tp = find(t) || [hc, tr];
       if (infPair) clearInfinity(t, tp);
       else addScore(t.v, tp[0], tp[1]);
       await sleep(srcs.length === 1 ? 100 : 130);
@@ -2205,7 +2225,7 @@
       <h2>How to play</h2>
       <ul>
         <li>Tap a column (or use ← → and Space) to shoot your tile up.</li>
-        <li>Tiles stick to the ceiling. Equal numbers that touch merge and double.</li>
+        <li>Tiles stick to the ceiling. Equal numbers that touch merge and double. A whole connected group merges at once: each extra block doubles the result again (3 blocks ×4, 4 blocks ×8, 5 blocks ×16…).</li>
         <li>Chain 2+ merges in one shot for a <b>combo</b>. Bigger combos earn bigger praise and more <span class="coin"></span> coins.</li>
         <li>Spend coins on helpers: <b>Swap</b> two blocks (200), <b>Hammer</b> a block (250), or <b>Undo</b> your last play (25).</li>
         <li>Switch (S) trades your current tile with the next one — free.</li>
