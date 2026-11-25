@@ -75,14 +75,14 @@
     font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase;
   }
   #nextTile, #nextTile2 {
-    width: 38px; height: 38px; border-radius: 7px;
-    display: grid; place-items: center; padding-bottom: 4px;
-    font: 900 13px "Arial Rounded MT Bold", "Nunito", "Varela Round", "Trebuchet MS", system-ui, sans-serif;
-    color: #fff; letter-spacing: 0;
-    box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.18);
-    text-shadow: -1.5px -1.5px 0 #1a1533, 1.5px -1.5px 0 #1a1533, -1.5px 1.5px 0 #1a1533, 1.5px 1.5px 0 #1a1533, 0 2px 0 #1a1533;
+    width: 46px; height: 46px; border-radius: 11px; flex: none;
+    display: grid; place-items: center; padding-bottom: 4px; overflow: hidden;
+    font: 400 20px/1 "Lilita One", "Fredoka", system-ui, sans-serif;
+    color: #fff; letter-spacing: 0; white-space: nowrap;
+    -webkit-text-stroke: .17em #1a1533; paint-order: stroke fill;
+    box-shadow: inset 0 -5px 0 rgba(0,0,0,.28), inset 0 3px 0 rgba(255,255,255,.3), 0 3px 0 rgba(0,0,0,.35);
   }
-  #nextTile2 { width: 28px; height: 28px; opacity: .8; }
+  #nextTile2 { width: 34px; height: 34px; border-radius: 9px; padding-bottom: 3px; opacity: .9; }
   button {
     font: inherit; font-weight: 600; color: var(--text);
     background: linear-gradient(#4a3aa6, var(--panel-2)); border: 0; border-radius: 14px;
@@ -924,8 +924,8 @@
     }
     $('coins').textContent = Math.max(0, coins - coinPending).toLocaleString();
     $('infCount').textContent = infCount.toLocaleString();
-    paintMini($('nextTile'), nxt, [0, 15, 15, 14, 12, 10]);
-    paintMini($('nextTile2'), nxt2, [0, 12, 12, 11, 9, 8]);
+    paintMini($('nextTile'), nxt, [0, 23, 22, 17, 14, 12]);
+    paintMini($('nextTile2'), nxt2, [0, 17, 16, 12, 10, 9]);
     const n = countTiles();
     $('tSwap').disabled = busy || over || (coins < priceOf('swap') && tool !== 'swap') || n < 2;
     $('tHammer').disabled = busy || over || (coins < priceOf('hammer') && tool !== 'hammer') || n < 1;
