@@ -11,6 +11,13 @@ Build a level mode on the existing engine first, with small boards that grow fro
 | 4 | Story: spend stars to restore an illustrated scene, one caption at a time | none |
 | 5 | **Store release (final polish)**: swap in the real art, monetisation, Android and iOS builds, store listings | Closed testing passes; both stores approve |
 
+## Economy and difficulty (v2, from the coin research)
+
+- **Earn less:** a first clear pays 30 coins (×2 🔥 Hard, ×3 💀 Super Hard, 150 for a world finale) plus 2 per shot left; combo coins halved. Chests, milestones and ∞ stay as rare celebrations. A full run of the 36 levels earns about 5,000 coins, down from about 12,000.
+- **Spend more, mostly on progress** (the big games' main sinks): +5 shots when out of shots (300, then 600, 900… in the same attempt; a continued win scores 1 star), pre-level boosters (+3 Shots 150, 🌈 Wild Tile 300, Hammer 250), and stock bought ahead in the Shop.
+- **Cosmetics as the long-term sink:** 6 board skins, Tile Buddies faces, 4 merge effects, 4 shot trails (about 12,600 coins in all).
+- **Difficulty tiers:** normal levels carry no label. 🔥 Hard (red-orange) and 💀 Super Hard (purple, skull) are flagged on the map, the start screen, the board frame and the goal bar. Current tiers: Hard 15, 30, 34; Super Hard 20, 35. Assign from bot win rates (Super Hard ≈ under 25%).
+
 ## Design rules from the research
 
 - One new idea per level; levels 1–6 use a fixed tile queue and can't be lost.
