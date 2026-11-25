@@ -513,6 +513,8 @@
       pal: ['#6bbf59', '#3e8e7e', '#c9a15b', '#8fb339', '#5fa8a0', '#d97b4f', '#4f9d69', '#e0c068', '#a3784e', '#7cc4a4', '#b5d16a'] },
     { id: 'quarry', name: 'Quarry', price: 1200, board: ['#22201c', '#2e2b26', '#3a3630'],
       pal: ['#c8a27a', '#8fa3a8', '#d9825b', '#9c8a74', '#b5b26b', '#c46d5e', '#7a95a8', '#e0b35b', '#a7786a', '#89b0a0', '#d6966b'] },
+    { id: 'frost', name: 'Frost', price: 1200, board: ['#0d1b2e', '#13263f', '#1a3150'],
+      pal: ['#8ecdf5', '#5fb3c9', '#c3d9f0', '#7f9be6', '#a6e3e9', '#e58fb0', '#5d8fd6', '#d8e9f5', '#9a88e0', '#74d1d8', '#b6c8ff'] },
   ];
   const SKIN_KEY = 'mergeQuest.skins.v1';   // { owned: [ids], on: id }
   function loadSkins() {
@@ -554,6 +556,12 @@
   // helps most where it lands. 1 is never a normal tile value (they start at 2).
   const WILD = 1;
   const S = STONE;                  // shorthand for level start boards
+  // Frozen blocks (World 3): a normal number locked in ice. Stored as -2v (so a
+  // frozen 8 is -16, never clashing with stones at -1/-2) and treated like a
+  // stone everywhere: it can't merge. A merge next to it thaws it into v.
+  const F = v => -2 * v;
+  const isFrozen = v => v <= -4;
+  const thawed = v => -v / 2;
   const INF_KEY = 'mergeQuest.infinity.v1';
   const FONT = '"Fredoka", "Arial Rounded MT Bold", "Nunito", "Varela Round", "Trebuchet MS", system-ui, sans-serif';
   const PAIR_MS = 220;    // suck-in time when just two blocks merge
@@ -843,7 +851,7 @@
   // Helpers won from chests, kept across games and modes (unlike freeUses,
   // which belong to one game or level).
   const INV_KEY = 'mergeQuest.inventory.v1';
-  let inv = { hammer: 0, swap: 0, undo: 0, shots: 0, wild: 0 };
+  let inv = { hammer: 0, swap: 0, undo: 0, shots: 0, wild: 0, heater: 0 };
   try { Object.assign(inv, JSON.parse(store.get(INV_KEY) || '{}')); } catch (e) {}
   const saveInv = () => store.set(INV_KEY, JSON.stringify(inv));
   const freeCount = name => freeUses[name] + inv[name];
@@ -1025,11 +1033,12 @@
     if (levelish() && !tool && !over) {
       const L = levelDef();
       const toStone = L.stoneEvery ? L.stoneEvery - (lv.used % L.stoneEvery) : 0;
+      const toSnow = L.snowEvery ? L.snowEvery - (lv.used % L.snowEvery) : 0;
       const tr = levelTier(L);
       $('hint').innerHTML = (tr ? `<span class="tier-pill ${L.tier}">${tr.icon} ${L.tier === 'super' ? 'SUPER HARD' : 'HARD'}</span>` : '') +
         `<span class="goal">🎯 ${goalText(L, true)}</span>` +
         (lv.shots ? ` · <b>${lv.shotsLeft}</b> shot${lv.shotsLeft === 1 ? '' : 's'} left` : '') +
-        (toStone ? ` · 🪨 in <b>${toStone}</b>` : '');
+        (toStone ? ` · 🪨 in <b>${toStone}</b>` : '') + (toSnow ? ` · ❄️ in <b>${toSnow}</b>` : '');
       return;
     }
     $('hint').textContent = tool === 'hammer' ? 'Tap a block to smash it (tap Hammer again to cancel).'
@@ -1172,6 +1181,7 @@
       const s = grid[nc][nr];
       if (!s || s.v >= 0 || seen.has(s)) continue;
       seen.add(s);
+      if (isFrozen(s.v)) { thaw(s); continue; }
       if (s.v === STONE) {
         s.v = CRACKED; s.s = 1.12; s.wob = { amp: 0.16, t: 0 };
         burst(s, 6, [0.8, 0.8], [0.03, 0.04], [0.35, 0.2], stoneDust);
@@ -1187,17 +1197,30 @@
     return broke;
   }
 
+  // Ice shatters off a frozen block; it's a normal block again (and may merge next).
+  const ICE_BITS = ['#e0f4ff', '#a5d8ff', '#ffffff', '#7cc4ff'];
+  function thaw(t) {
+    t.v = thawed(t.v);
+    t.s = 1.18; t.wob = { amp: 0.18, t: 0 };
+    burst(t, 14, [1.1, 1.5], [0.03, 0.05], [0.5, 0.3], i => ICE_BITS[i % ICE_BITS.length]);
+    floaters.push({ text: '❄️', x: t.x + cell / 2, y: t.y + cell / 2, life: 0.9 });
+    if (lv) lv.thawed = (lv.thawed || 0) + 1;
+    thawMilestone();
+  }
+
   // Level mode: a stone rises into a random column that has room.
-  function dropStone() {
+  function dropStone(v = STONE) {
     const open = [];
     for (let c = 0; c < cols; c++) if (count(c) < rows) open.push(c);
     if (!open.length) return;
     const c = open[Math.floor(Math.random() * open.length)], r = count(c);
-    const t = newTile(STONE, cellX(c), launchY());
+    const t = newTile(v, cellX(c), launchY());
     t.s = 0.6; t.ty = launchY();      // stepTile turns the move into a flight
     grid[c][r] = t;
-    banner = { text: '🪨 A stone rolled in!', life: 1.2 };
+    banner = { text: v === STONE ? '🪨 A stone rolled in!' : '❄️ Snowfall! A frozen block dropped in', life: 1.3 };
   }
+  // Snowfall: a frozen block worth a value from the level's range (2 … 2^spawn).
+  const dropSnow = () => dropStone(F(Math.pow(2, 1 + Math.floor(Math.random() * Math.min(levelDef().spawn || 3, 5)))));
 
   // ---------- one-time milestone bounties (any mode, paid once ever) ----------
   // Paid outside lastEarned, so undoing the play doesn't take a bounty back.
@@ -1205,6 +1228,18 @@
   const MILESTONES = [[2048, 300], [4096, 500], [4194304, 1000], [INF, 2000]];
   function loadBounties() {
     try { return JSON.parse(store.get(BOUNTY_KEY) || '{}') || {}; } catch (e) { return {}; }
+  }
+  // Lifetime thaw count: the first 50 thawed blocks pay a one-time bounty.
+  const THAW_KEY = 'mergeQuest.thawed.v1', THAW_GOAL = 50, THAW_PAY = 400;
+  function thawMilestone() {
+    const n = (parseInt(store.get(THAW_KEY) || '0', 10) || 0) + 1;
+    store.set(THAW_KEY, String(n));
+    const got = loadBounties();
+    if (n >= THAW_GOAL && !got.thaw) {
+      got.thaw = Date.now(); store.set(BOUNTY_KEY, JSON.stringify(got));
+      setCoins(coins + THAW_PAY); launchCoins(THAW_PAY);
+      toast(`🏅 ${THAW_GOAL} blocks thawed! +${THAW_PAY} coins`);
+    }
   }
   function milestoneCheck(v) {
     const got = loadBounties();
@@ -1230,7 +1265,9 @@
       <p>One-time bounties, in any mode.</p>
       <ul class="ms-list">${MILESTONES.map(([at, pay]) => `
         <li class="${got[at] ? 'done' : ''}"><span>${got[at] ? '✅' : '🔒'} First <b>${fmt(at)}</b> block</span>
-        <span>${got[at] ? 'Claimed' : `<span class="coin"></span> ${pay}`}</span></li>`).join('')}</ul>
+        <span>${got[at] ? 'Claimed' : `<span class="coin"></span> ${pay}`}</span></li>`).join('')}
+        <li class="${got.thaw ? 'done' : ''}"><span>${got.thaw ? '✅' : '❄️'} Thaw <b>${THAW_GOAL}</b> frozen blocks${got.thaw ? '' : ` (${Math.min(THAW_GOAL, parseInt(store.get(THAW_KEY) || '0', 10) || 0)}/${THAW_GOAL})`}</span>
+        <span>${got.thaw ? 'Claimed' : `<span class="coin"></span> ${THAW_PAY}`}</span></li></ul>
       <button class="primary" id="closeBtn">Close</button>`);
     $('closeBtn').onclick = hideOverlay;
   }
@@ -1304,11 +1341,25 @@
     { cols: 5, rows: 6, goal: ['make', 256], shots: 56, spawn: 5, stoneEvery: 7, tier: 'hard' },
     { cols: 5, rows: 7, goal: ['break', 6], shots: 34, spawn: 5, stoneEvery: 5, tier: 'super', intro: 'Stones keep coming. Break 6 of them.' },
     { cols: 5, rows: 7, goal: ['make', 512], shots: 0, spawn: 6, stoneEvery: 8, start: [[S], [], [S], [], [S]], chest: { coins: 300, hammer: 1, swap: 1 }, intro: 'Quarry finale: make a 512 while the stones roll in. No shot limit.' },
+    // ---- World 3: Frost Peaks (37-48) - frozen blocks thaw when you merge beside them
+    { cols: 3, rows: 4, goal: ['thaw', 1], shots: 6, start: [[F(8)], [4], []], queue: [4, 2, 8, 2, 4, 2], hint: 1, intro: 'Ice! A frozen block can\'t merge. Merge right next to it and it thaws — then it can join in.' },
+    { cols: 3, rows: 4, goal: ['thaw', 3], shots: 10, start: [[F(4), 2], [F(16)], [8, F(4)]], queue: [2, 8, 4, 2, 4, 2, 8, 2, 4, 2], hint: 0, intro: 'A thawed block can set off another merge. Chain them!' },
+    { cols: 4, rows: 5, goal: ['make', 128], shots: 24, spawn: 4, start: [[F(32)], [], [F(32)], []], intro: 'Two frozen 32s. Thaw them next to each other for a big merge.' },
+    { cols: 4, rows: 5, goal: ['thaw', 4], shots: 16, spawn: 4, start: [[F(8), 2], [4, F(16)], [F(4)], [2, F(8)]] },
+    { cols: 5, rows: 6, goal: ['combo', 3], shots: 12, spawn: 4, start: [[F(16), 8], [F(16)], [8], [F(32)], []], intro: 'Thaw a block mid-chain and the combo keeps going.' },
+    { cols: 5, rows: 6, goal: ['thaw', 7], shots: 6, spawn: 4, start: [[F(8), 2, F(4)], [F(16), 4], [2, F(8), F(2)], [F(4), 8], [F(32), 2]], tier: 'hard', gift: { heater: 1 }, intro: 'A frozen wall. Here\'s a free 🔥 Heater booster: it thaws everything before you start.' },
+    { cols: 5, rows: 6, goal: ['make', 128], shots: 60, spawn: 4, intro: 'A breather. No ice at all!' },
+    { cols: 5, rows: 7, goal: ['break', 3], shots: 24, spawn: 4, start: [[S, F(8)], [4, S], [F(16), 2], [S, 8], [F(8)]], intro: 'Stones and ice together. Stones block, ice rewards — the same merges crack both.' },
+    { cols: 5, rows: 7, goal: ['score', 500], shots: 30, spawn: 5, start: [[F(32), S], [8], [F(64)], [4, S], [F(32)]] },
+    { cols: 5, rows: 7, goal: ['thaw', 6], shots: 30, spawn: 5, snowEvery: 5, start: [[F(8)], [F(4)], [], [F(16)], [F(2)]], intro: 'Snowfall! A frozen block drops in every few shots. The bar shows when.' },
+    { cols: 5, rows: 7, goal: ['make', 512], shots: 58, spawn: 5, snowEvery: 5, start: [[S], [F(16)], [S], [F(16)], [S]], tier: 'super', intro: 'Heavy snow and stones. Keep the board moving.' },
+    { cols: 5, rows: 7, goal: ['make', 1024], shots: 0, spawn: 6, snowEvery: 6, start: [[F(64)], [], [F(64)], [], [F(64)]], chest: { coins: 300, hammer: 1, swap: 1 }, intro: 'Frost Peaks finale: make a 1024 in the snowfall. No shot limit.' },
   ];
   // Worlds group the levels on the map; each ends with a finale.
   const WORLDS = [
     { name: 'Basics', from: 1, to: 24 },
     { name: 'Stone Quarry', from: 25, to: 36 },
+    { name: 'Frost Peaks', from: 37, to: 48 },
   ];
   const worldOf = n => WORLDS.find(w => n >= w.from && n <= w.to) || WORLDS[0];
   // Difficulty tiers, as in Candy Crush / Royal Match: normal levels carry no
@@ -1332,7 +1383,7 @@
   function loadProgress() {
     try {
       const p = JSON.parse(store.get(PROGRESS_KEY) || 'null');
-      if (p && typeof p.stars === 'object') return { stars: p.stars, fails: p.fails || {}, cleared: p.cleared || {}, streak: p.streak || 0 };
+      if (p && typeof p.stars === 'object') return { stars: p.stars, fails: p.fails || {}, cleared: p.cleared || {}, streak: p.streak || 0, gifts: p.gifts || {} };
     } catch (e) {}
     return { stars: {}, fails: {}, cleared: {}, streak: 0 };
   }
@@ -1366,6 +1417,7 @@
       case 'leave': return `Leave <b>${v} or fewer</b> blocks` + (pr ? ` (now ${countTiles()})` : '');
       case 'survive': return `Survive <b>${v} shots</b> without filling up`;
       case 'break': return `Break <b>${v} stone${v === 1 ? '' : 's'}</b>` + (pr ? ` (${Math.min(v, lv.broken || 0)}/${v})` : '');
+      case 'thaw': return `Thaw <b>${v} frozen block${v === 1 ? '' : 's'}</b>` + (pr ? ` (${Math.min(v, lv.thawed || 0)}/${v})` : '');
     }
     return '';
   }
@@ -1380,6 +1432,7 @@
       case 'leave': return lv.used > 0 && countTiles() <= v;
       case 'survive': return lv.shots > 0 && lv.shotsLeft <= 0;
       case 'break': return (lv.broken || 0) >= v;
+      case 'thaw': return (lv.thawed || 0) >= v;
     }
     return false;
   }
@@ -1390,7 +1443,16 @@
     return drawFromBag(1, L.spawn || 3);
   }
 
-  function startLevel(n) { beginAttempt(LEVELS[n - 1], 'level', { n }); }
+  function startLevel(n) {
+    const L = LEVELS[n - 1], pr = loadProgress();
+    if (L.gift && !(pr.gifts || {})[n]) {   // a one-time free sample of a new booster
+      for (const k in L.gift) inv[k] = (inv[k] || 0) + L.gift[k];
+      saveInv();
+      pr.gifts = { ...(pr.gifts || {}), [n]: true };
+      saveProgress(pr);
+    }
+    beginAttempt(L, 'level', { n });
+  }
 
   // ---------- Daily challenge ----------
   // One board a day, the same for everyone: the date seeds the start board and
@@ -1560,12 +1622,14 @@
     { id: 'shots', icon: '➕', name: '+3 Shots', price: 150 },
     { id: 'wild', icon: '🌈', name: 'Wild Tile', price: 300 },
     { id: 'hammer', icon: '🔨', name: 'Hammer', price: 250 },
+    { id: 'heater', icon: '🔥', name: 'Heater', price: 250, ice: true },
   ];
   let picked = new Set();
   // Why a booster can't be picked here ('' = it can).
   function boosterBlock(b, L) {
     if (b.id === 'shots' && !L.shots) return 'No shot limit';
     if (b.id === 'hammer' && freeCount('hammer') > 0) return `Ready ×${freeCount('hammer')}`;
+    if (b.id === 'heater' && !allTiles().some(t => isFrozen(t.v))) return 'No ice yet';
     return '';
   }
   const boosterCost = () => BOOSTERS.filter(b => picked.has(b.id) && !(inv[b.id] > 0 && b.id !== 'hammer'))
@@ -1573,7 +1637,8 @@
   function boosterHtml(L) {
     if (mode === 'level' && lv.n <= 6) return '';      // scripted tutorials: no boosters yet
     if (L.noHelpers) return '<p class="tier-note">🚫 No boosters or helpers on this level.</p>';
-    return `<div class="boost-head">Boosters</div><div class="boost-row">${BOOSTERS.map(b => {
+    const icy = L.snowEvery || allTiles().some(t => isFrozen(t.v));
+    return `<div class="boost-head">Boosters</div><div class="boost-row">${BOOSTERS.filter(b => !b.ice || icy).map(b => {
       const block = boosterBlock(b, L), own = b.id !== 'hammer' && inv[b.id] > 0;
       return `<button class="boost${picked.has(b.id) ? ' on' : ''}" data-b="${b.id}" ${block ? 'disabled' : ''}>
         <span class="bi">${b.icon}</span><span class="bn">${b.name}</span>
@@ -1599,8 +1664,10 @@
         if (b.id === 'shots') { lv.shots += 3; lv.shotsLeft += 3; }
         if (b.id === 'hammer') freeUses.hammer++;
         if (b.id === 'wild') { nxt2 = nxt; nxt = cur; cur = WILD; resetShooter(); }
+        if (b.id === 'heater') for (const t of allTiles()) if (isFrozen(t.v)) thaw(t);
       }
       if (picked.size) toast('🚀 Boosters ready!');
+      if (picked.has('heater')) setTimeout(() => { if (!busy) { busy = true; resolve(allTiles().map(t => find(t))).then(cb => { rewardCombo(cb); finishTurn(); }); } }, 250);
       picked = new Set();
       hideOverlay(); save(); updateHud();
     };
@@ -1616,6 +1683,7 @@
       ${L.intro ? `<p>${L.intro}</p>` : ''}
       ${mode === 'daily' ? `<p>Today's board is the same for every player.${loadDaily().won[lv.day] === undefined ? ` First win pays <span class="coin"></span> <b>${DAILY_REWARD}</b>.` : ' Already won today: play for stars.'}</p>` : ''}
       ${L.stoneEvery ? `<p>🪨 A stone rolls in every <b>${L.stoneEvery}</b> shots.</p>` : ''}
+      ${L.snowEvery ? `<p>❄️ Snowfall: a frozen block drops in every <b>${L.snowEvery}</b> shots.</p>` : ''}
       ${levelPerks ? `<p class="streak">🔥 Win streak bonus: ${levelPerks}</p>` : ''}
       <p>${L.shots ? `<b>${L.shots}</b> shots` : 'No shot limit'}${free.length ? ' · ' + free.join(', ') : ''}</p>
       ${levelTier(L) ? `<p class="tier-note">${levelTier(L).icon} Coin reward ×${levelTier(L).mult}.${L.noHelpers ? '' : ' Boosters can help!'}</p>` : ''}
@@ -2019,6 +2087,7 @@
     { id: 'shots', icon: '➕', name: '+3 Shots', price: 150, desc: 'Three extra shots. Pick it before a level.' },
     { id: 'hammer', icon: '🔨', name: 'Hammer', price: 250, desc: 'Smash any block, any time.' },
     { id: 'swap', icon: '⇄', name: 'Swap', price: 200, desc: 'Trade any two blocks, any time.' },
+    { id: 'heater', icon: '🔥', name: 'Heater', price: 250, desc: 'Thaws every frozen block. Pick it before a Frost Peaks level.' },
   ];
   function buy(price, then) {
     if (coins < price) { toast('Not enough coins'); return; }
@@ -2262,10 +2331,14 @@
     if (!launchable(nxt)) nxt = rollValue();
     if (!launchable(nxt2)) nxt2 = rollValue();
     if (levelish()) {
-      const every = levelDef().stoneEvery;
+      const L = levelDef(), every = L.stoneEvery, snow = L.snowEvery;
       if (every && lv.used && lv.used % every === 0 && lv.dropAt !== lv.used && !goalMet()) {
         lv.dropAt = lv.used;
         dropStone();
+      }
+      if (snow && lv.used && lv.used % snow === 0 && lv.snowAt !== lv.used && !goalMet()) {
+        lv.snowAt = lv.used;
+        dropSnow();
       }
       if (levelEnded()) { updateHud(); return; }
     }
@@ -2355,6 +2428,18 @@
     if (busy || !tool) return;
     const t = grid[c] && grid[c][r];
     if (!t) return;
+    if (tool === 'hammer' && isFrozen(t.v)) {    // smashes the ice, keeps the block
+      takeSnap();
+      spend('hammer');
+      tool = null; busy = true;
+      thaw(t);
+      updateHud();
+      await sleep(220);
+      const combo = await resolve([[c, r]]);
+      rewardCombo(combo);
+      finishTurn();
+      return;
+    }
     if (tool === 'hammer') {
       takeSnap();
       spend('hammer');
@@ -2554,6 +2639,7 @@
         <li>Chain 2+ merges in one shot for a <b>combo</b>. Bigger combos earn bigger praise and more <span class="coin"></span> coins.</li>
         <li>Spend coins on helpers: <b>Swap</b> two blocks (200), <b>Hammer</b> a block (250), or <b>Undo</b> your last play (25).</li>
         <li>Before a level, pick <b>boosters</b>: +3 Shots, a <b>🌈 Wild Tile</b> (becomes the best match where it lands) or a Hammer. Run out of shots? Buy <b>+5 shots</b> to keep going (300 coins, then 600…).</li>
+        <li>❄️ <b>Frozen blocks</b> (World 3) can't merge. A merge right next to one thaws it into a normal block, which can merge straight away. A Hammer smashes the ice too.</li>
         <li>🔥 <b>Hard</b> and 💀 <b>Super Hard</b> levels are marked on the map and pay ×2 and ×3 coins.</li>
         <li>The <b>🛒 Shop</b> has boosters, board skins, faces for your blocks, merge effects and shot trails.</li>
         <li>Switch (S) trades your current tile with the next one — free.</li>
@@ -2683,8 +2769,37 @@
     ctx.strokeStyle = st.stroke; ctx.stroke();
   }
 
+  // A sheet of ice over a frozen block: pale blue glaze, frost streaks, a flake.
+  function drawIce(x, y, sx, sy, alpha) {
+    const pad = cell * 0.02;
+    const w = (cell - pad * 2) * Math.max(0.05, sx), h = (cell - pad * 2) * Math.max(0.05, sy);
+    const left = x + cell / 2 - w / 2, top = y + cell / 2 - h / 2, rad = Math.min(w, h) * 0.16;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const g = ctx.createLinearGradient(left, top, left + w, top + h);
+    g.addColorStop(0, 'rgba(225,245,255,0.72)');
+    g.addColorStop(0.5, 'rgba(160,215,255,0.5)');
+    g.addColorStop(1, 'rgba(200,235,255,0.68)');
+    rr(left, top, w, h, rad);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = Math.max(1.5, cell * 0.035);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';   // frost streaks
+    ctx.lineWidth = Math.max(1, cell * 0.02); ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(left + w * 0.14, top + h * 0.3); ctx.lineTo(left + w * 0.34, top + h * 0.12);
+    ctx.moveTo(left + w * 0.12, top + h * 0.5); ctx.lineTo(left + w * 0.5, top + h * 0.14);
+    ctx.moveTo(left + w * 0.66, top + h * 0.9); ctx.lineTo(left + w * 0.88, top + h * 0.66);
+    ctx.stroke();
+    ctx.font = `${cell * 0.24}px serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('❄️', left + w * 0.82, top + h * 0.18);
+    ctx.restore();
+  }
+
   let nowMs = 0;
   function drawTile(v, x, y, sx, sy, alpha, round = 0, noText = false) {
+    if (isFrozen(v)) { drawTile(thawed(v), x, y, sx, sy, alpha, round, noText); drawIce(x, y, sx, sy, alpha); return; }
     if (v < 0) { drawStone(v, x, y, sx, sy, alpha); return; }
     const st = tileStyle(v);
     const pad = cell * 0.035;

@@ -8,6 +8,7 @@ Build a level mode on the existing engine first, with small boards that grow fro
 | 1 | **Level mode MVP** *(built, now in playtesting)*: variable board size, 24 teaching levels, goals + shot limits + 1–3 stars, level map, free helper samples | Bot wins levels 1–6 every time; a new player finishes 1–12 without help |
 | 2 | **Rewards** *(built)*: win-streak ladder (3 wins → free Hammer, 5 → + free Swap; a loss costs 2 steps), chests on levels 10 and 20 (coins + banked helpers), one-time bounties for the first 2048 / 4K / 4M / ∞, and a home screen to pick a mode | Players replay levels for 3 stars |
 | 3 | **Variety** *(built, now in playtesting)*: World 2 "Stone Quarry" (levels 25–36) with stone blockers, a seeded daily challenge, and 4 tile/board skins as coin sinks | New worlds still feel fresh |
+| 3b | **World 3: Frost Peaks** *(built, now in playtesting)*: levels 37–48 with frozen blocks (merge beside one to thaw it into a normal block), snowfall, ice + stones together, a free Heater booster sample on level 42, a Frost skin and a "thaw 50 blocks" milestone. Hard: 42; Super Hard: 47 | Tutorial levels 37–38 always won; finale about 50% for the bot |
 | 4 | Story: spend stars to restore an illustrated scene, one caption at a time | none |
 | 5 | **Store release (final polish)**: swap in the real art, monetisation, Android and iOS builds, store listings | Closed testing passes; both stores approve |
 
@@ -16,7 +17,7 @@ Build a level mode on the existing engine first, with small boards that grow fro
 - **Earn less:** a first clear pays 30 coins (×2 🔥 Hard, ×3 💀 Super Hard, 150 for a world finale) plus 2 per shot left; combo coins halved. Chests, milestones and ∞ stay as rare celebrations. A full run of the 36 levels earns about 5,000 coins, down from about 12,000.
 - **Spend more, mostly on progress** (the big games' main sinks): +5 shots when out of shots (300, then 600, 900… in the same attempt; a continued win scores 1 star), pre-level boosters (+3 Shots 150, 🌈 Wild Tile 300, Hammer 250), and stock bought ahead in the Shop.
 - **Cosmetics as the long-term sink:** 6 board skins, Tile Buddies faces, 4 merge effects, 4 shot trails (about 12,600 coins in all).
-- **Difficulty tiers:** normal levels carry no label. 🔥 Hard (red-orange) and 💀 Super Hard (purple, skull) are flagged on the map, the start screen, the board frame and the goal bar. Current tiers: Hard 15, 30, 34; Super Hard 20, 35. Assign from bot win rates (Super Hard ≈ under 25%).
+- **Difficulty tiers:** normal levels carry no label. 🔥 Hard (red-orange) and 💀 Super Hard (purple, skull) are flagged on the map, the start screen, the board frame and the goal bar. Current tiers: Hard 15, 30, 34, 42; Super Hard 20, 35, 47. Assign from bot win rates (Super Hard ≈ under 25%).
 
 ## Design rules from the research
 
