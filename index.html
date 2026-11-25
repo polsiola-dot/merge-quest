@@ -1319,7 +1319,7 @@
     { cols: 4, rows: 4, goal: ['score', 200], shots: 18, spawn: 5, free: { swap: 1 }, intro: 'A free Swap: trade any two blocks.' },
     { cols: 4, rows: 5, goal: ['combo', 3], shots: 12, spawn: 4, start: [[32, 16, 8], [], [], []], intro: 'Build a staircase, then trigger it.' },
     { cols: 4, rows: 5, goal: ['score', 220], shots: 20, spawn: 4 },
-    { cols: 4, rows: 5, goal: ['survive', 30], shots: 30, spawn: 6, start: [[2, 8, 32, 4], [16, 4, 2, 64], [8, 32, 4, 16], [4, 2, 8, 32]], tier: 'hard', intro: 'The board is nearly full. Last 30 shots!' },
+    { cols: 4, rows: 5, goal: ['survive', 40], shots: 40, spawn: 7, start: [[2, 8, 32, 4], [16, 4, 2, 64], [8, 32, 4, 16], [4, 2, 8, 32]], tier: 'hard', intro: 'The board is nearly full. Last 40 shots!' },
     { cols: 4, rows: 6, goal: ['make', 256], shots: 45, spawn: 6 },
     { cols: 4, rows: 6, goal: ['make', 64], shots: 18, spawn: 4, intro: 'Fewer shots — make every one count.' },
     { cols: 5, rows: 6, goal: ['make', 256], shots: 55, spawn: 5, intro: 'Five columns now. Use the middle!' },
@@ -1340,20 +1340,20 @@
     { cols: 5, rows: 6, goal: ['combo', 3], shots: 9, spawn: 4, start: [[32, S], [16, S], [8], [S], [S]], intro: 'Chains break stones too. Every merge counts.' },
     { cols: 5, rows: 6, goal: ['leave', 2], shots: 10, start: [[S, 4], [2, 8], [S, 4], [2], [S]], queue: [2, 2, 8, 4, 2, 2, 4, 8, 2, 4], free: { undo: 2 }, intro: 'Clean the quarry: leave 2 or fewer blocks. Stones count!' },
     { cols: 5, rows: 6, goal: ['make', 256], shots: 56, spawn: 5, stoneEvery: 7, tier: 'hard' },
-    { cols: 5, rows: 7, goal: ['break', 6], shots: 34, spawn: 5, stoneEvery: 5, tier: 'super', intro: 'Stones keep coming. Break 6 of them.' },
-    { cols: 5, rows: 7, goal: ['make', 512], shots: 0, spawn: 6, stoneEvery: 8, start: [[S], [], [S], [], [S]], chest: { coins: 300, hammer: 1, swap: 1 }, intro: 'Quarry finale: make a 512 while the stones roll in. No shot limit.' },
+    { cols: 5, rows: 7, goal: ['break', 6], shots: 35, spawn: 5, stoneEvery: 5, tier: 'super', intro: 'Stones keep coming. Break 6 of them.' },
+    { cols: 5, rows: 7, goal: ['make', 512], shots: 110, spawn: 6, stoneEvery: 8, start: [[S], [], [S], [], [S]], chest: { coins: 300, hammer: 1, swap: 1 }, intro: 'Quarry finale: make a 512 in 110 shots while the stones roll in.' },
     // ---- World 3: Frost Peaks (37-48) - frozen blocks thaw when you merge beside them
     { cols: 3, rows: 4, goal: ['thaw', 1], shots: 6, start: [[F(8)], [4], []], queue: [4, 2, 8, 2, 4, 2], hint: 1, intro: 'Ice! A frozen block can\'t merge. Merge right next to it and it thaws — then it can join in.' },
     { cols: 3, rows: 4, goal: ['thaw', 3], shots: 10, start: [[F(4), 2], [F(16)], [8, F(4)]], queue: [2, 8, 4, 2, 4, 2, 8, 2, 4, 2], hint: 0, intro: 'A thawed block can set off another merge. Chain them!' },
     { cols: 4, rows: 5, goal: ['make', 128], shots: 24, spawn: 4, start: [[F(32)], [], [F(32)], []], intro: 'Two frozen 32s. Thaw them next to each other for a big merge.' },
-    { cols: 4, rows: 5, goal: ['thaw', 4], shots: 16, spawn: 4, start: [[F(8), 2], [4, F(16)], [F(4)], [2, F(8)]] },
-    { cols: 5, rows: 6, goal: ['combo', 3], shots: 12, spawn: 4, start: [[F(16), 8], [F(16)], [8], [F(32)], []], intro: 'Thaw a block mid-chain and the combo keeps going.' },
-    { cols: 5, rows: 6, goal: ['thaw', 7], shots: 6, spawn: 4, start: [[F(8), 2, F(4)], [F(16), 4], [2, F(8), F(2)], [F(4), 8], [F(32), 2]], tier: 'hard', intro: 'A frozen wall, and only 6 shots. Every merge has to thaw something.' },
+    { cols: 4, rows: 5, goal: ['thaw', 4], shots: 9, spawn: 4, start: [[F(8), 2], [4, F(16)], [F(4)], [2, F(8)]] },
+    { cols: 5, rows: 6, goal: ['combo', 3], shots: 6, spawn: 4, start: [[F(16), 8], [F(16)], [8], [F(32)], []], intro: 'Thaw a block mid-chain and the combo keeps going.' },
+    { cols: 5, rows: 6, goal: ['thaw', 7], shots: 5, spawn: 4, start: [[F(8), 2, F(4)], [F(16), 4], [2, F(8), F(2)], [F(4), 8], [F(32), 2]], tier: 'hard', intro: 'A frozen wall, and only 5 shots. Every merge has to thaw something.' },
     { cols: 5, rows: 6, goal: ['make', 128], shots: 60, spawn: 4, intro: 'A breather. No ice at all!' },
-    { cols: 5, rows: 7, goal: ['break', 3], shots: 24, spawn: 4, start: [[S, F(8)], [4, S], [F(16), 2], [S, 8], [F(8)]], intro: 'Stones and ice together. Stones block, ice rewards — the same merges crack both.' },
-    { cols: 5, rows: 7, goal: ['score', 500], shots: 30, spawn: 5, start: [[F(32), S], [8], [F(64)], [4, S], [F(32)]], gift: { heater: 1 }, intro: 'Here\'s a free 🔥 Heater booster: pick it to thaw every frozen block before you start. (It can\'t be used on Thaw goals.)' },
-    { cols: 5, rows: 7, goal: ['thaw', 6], shots: 30, spawn: 5, snowEvery: 5, start: [[F(8)], [F(4)], [], [F(16)], [F(2)]], intro: 'Snowfall! A frozen block drops in every few shots. The bar shows when.' },
-    { cols: 5, rows: 7, goal: ['make', 512], shots: 58, spawn: 5, snowEvery: 5, start: [[S], [F(16)], [S], [F(16)], [S]], tier: 'super', intro: 'Heavy snow and stones. Keep the board moving.' },
+    { cols: 5, rows: 7, goal: ['break', 3], shots: 12, spawn: 4, start: [[S, F(8)], [4, S], [F(16), 2], [S, 8], [F(8)]], intro: 'Stones and ice together. Stones block, ice rewards — the same merges crack both.' },
+    { cols: 5, rows: 7, goal: ['score', 600], shots: 30, spawn: 5, start: [[F(32), S], [8], [F(64)], [4, S], [F(32)]], gift: { heater: 1 }, intro: 'Here\'s a free 🔥 Heater booster: pick it to thaw every frozen block before you start. (It can\'t be used on Thaw goals.)' },
+    { cols: 5, rows: 7, goal: ['thaw', 6], shots: 17, spawn: 5, snowEvery: 5, start: [[F(8)], [F(4)], [], [F(16)], [F(2)]], intro: 'Snowfall! A frozen block drops in every few shots. The bar shows when.' },
+    { cols: 5, rows: 7, goal: ['make', 512], shots: 64, spawn: 5, snowEvery: 6, start: [[S], [F(16)], [S], [F(16)], [S]], tier: 'super', intro: 'Heavy snow and stones. Keep the board moving.' },
     { cols: 5, rows: 7, goal: ['make', 1024], shots: 0, spawn: 6, snowEvery: 6, start: [[F(64)], [], [F(64)], [], [F(64)]], chest: { coins: 300, hammer: 1, swap: 1 }, intro: 'Frost Peaks finale: make a 1024 in the snowfall. No shot limit.' },
   ];
   // Worlds group the levels on the map; each ends with a finale.
@@ -3171,7 +3171,10 @@
       ctx.fillStyle = 'rgba(255,211,77,0.95)';
       ctx.fill();
       ctx.fillStyle = '#1a1533';
-      ctx.font = `800 ${Math.min(cell * 0.26, 18)}px system-ui, sans-serif`;
+      let bfs = Math.min(cell * 0.26, 18);
+      ctx.font = `800 ${bfs}px system-ui, sans-serif`;
+      const room = cell * cols - 40, bw = ctx.measureText(banner.text).width;
+      if (bw > room) { bfs *= room / bw; ctx.font = `800 ${bfs}px system-ui, sans-serif`; }   // long text: shrink to fit
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(banner.text, bx + cell * cols / 2, bY + bh / 2);
