@@ -181,12 +181,13 @@
     background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.14); box-shadow: 0 3px 0 rgba(0,0,0,.3); }
   .boost .bi { font-size: 24px; line-height: 1.1; }
   .boost .bn { font-size: 13px; font-weight: 700; white-space: nowrap; }
-  .boost .bp { font-size: 12px; color: var(--accent); white-space: nowrap; }
+  .boost .bp { font-size: 12px; color: var(--accent); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .boost.on { background: rgba(255,211,77,.22); border-color: var(--accent); box-shadow: 0 0 12px rgba(255,211,77,.5), 0 3px 0 rgba(0,0,0,.3); }
   .boost.on::after { content: '✓'; position: absolute; }
   .boost { position: relative; }
   .boost.on::after { top: -7px; right: -5px; background: var(--accent); color: #2b1660; border-radius: 50%;
     width: 20px; height: 20px; font-size: 13px; line-height: 20px; font-weight: 900; }
+  .boost:disabled { opacity: .45; filter: grayscale(.6); }
   .boost:disabled .bp { color: var(--muted); }
   button.cont { font-size: 17px; }
   .stars { font-size: 34px; letter-spacing: 6px; color: var(--accent); }
@@ -1347,10 +1348,10 @@
     { cols: 4, rows: 5, goal: ['make', 128], shots: 24, spawn: 4, start: [[F(32)], [], [F(32)], []], intro: 'Two frozen 32s. Thaw them next to each other for a big merge.' },
     { cols: 4, rows: 5, goal: ['thaw', 4], shots: 16, spawn: 4, start: [[F(8), 2], [4, F(16)], [F(4)], [2, F(8)]] },
     { cols: 5, rows: 6, goal: ['combo', 3], shots: 12, spawn: 4, start: [[F(16), 8], [F(16)], [8], [F(32)], []], intro: 'Thaw a block mid-chain and the combo keeps going.' },
-    { cols: 5, rows: 6, goal: ['thaw', 7], shots: 6, spawn: 4, start: [[F(8), 2, F(4)], [F(16), 4], [2, F(8), F(2)], [F(4), 8], [F(32), 2]], tier: 'hard', gift: { heater: 1 }, intro: 'A frozen wall. Here\'s a free 🔥 Heater booster: it thaws everything before you start.' },
+    { cols: 5, rows: 6, goal: ['thaw', 7], shots: 6, spawn: 4, start: [[F(8), 2, F(4)], [F(16), 4], [2, F(8), F(2)], [F(4), 8], [F(32), 2]], tier: 'hard', intro: 'A frozen wall, and only 6 shots. Every merge has to thaw something.' },
     { cols: 5, rows: 6, goal: ['make', 128], shots: 60, spawn: 4, intro: 'A breather. No ice at all!' },
     { cols: 5, rows: 7, goal: ['break', 3], shots: 24, spawn: 4, start: [[S, F(8)], [4, S], [F(16), 2], [S, 8], [F(8)]], intro: 'Stones and ice together. Stones block, ice rewards — the same merges crack both.' },
-    { cols: 5, rows: 7, goal: ['score', 500], shots: 30, spawn: 5, start: [[F(32), S], [8], [F(64)], [4, S], [F(32)]] },
+    { cols: 5, rows: 7, goal: ['score', 500], shots: 30, spawn: 5, start: [[F(32), S], [8], [F(64)], [4, S], [F(32)]], gift: { heater: 1 }, intro: 'Here\'s a free 🔥 Heater booster: pick it to thaw every frozen block before you start. (It can\'t be used on Thaw goals.)' },
     { cols: 5, rows: 7, goal: ['thaw', 6], shots: 30, spawn: 5, snowEvery: 5, start: [[F(8)], [F(4)], [], [F(16)], [F(2)]], intro: 'Snowfall! A frozen block drops in every few shots. The bar shows when.' },
     { cols: 5, rows: 7, goal: ['make', 512], shots: 58, spawn: 5, snowEvery: 5, start: [[S], [F(16)], [S], [F(16)], [S]], tier: 'super', intro: 'Heavy snow and stones. Keep the board moving.' },
     { cols: 5, rows: 7, goal: ['make', 1024], shots: 0, spawn: 6, snowEvery: 6, start: [[F(64)], [], [F(64)], [], [F(64)]], chest: { coins: 300, hammer: 1, swap: 1 }, intro: 'Frost Peaks finale: make a 1024 in the snowfall. No shot limit.' },
@@ -1629,13 +1630,14 @@
   function boosterBlock(b, L) {
     if (b.id === 'shots' && !L.shots) return 'No shot limit';
     if (b.id === 'hammer' && freeCount('hammer') > 0) return `Ready ×${freeCount('hammer')}`;
+    if (b.id === 'heater' && L.goal[0] === 'thaw') return 'Not here';   // would skip the level
     if (b.id === 'heater' && !allTiles().some(t => isFrozen(t.v))) return 'No ice yet';
     return '';
   }
   const boosterCost = () => BOOSTERS.filter(b => picked.has(b.id) && !(inv[b.id] > 0 && b.id !== 'hammer'))
     .reduce((a, b) => a + b.price, 0);
   function boosterHtml(L) {
-    if (mode === 'level' && lv.n <= 6) return '';      // scripted tutorials: no boosters yet
+    if (L.queue) return '';            // scripted tutorial levels (fixed tiles): no boosters
     if (L.noHelpers) return '<p class="tier-note">🚫 No boosters or helpers on this level.</p>';
     const icy = L.snowEvery || allTiles().some(t => isFrozen(t.v));
     return `<div class="boost-head">Boosters</div><div class="boost-row">${BOOSTERS.filter(b => !b.ice || icy).map(b => {
@@ -2087,7 +2089,7 @@
     { id: 'shots', icon: '➕', name: '+3 Shots', price: 150, desc: 'Three extra shots. Pick it before a level.' },
     { id: 'hammer', icon: '🔨', name: 'Hammer', price: 250, desc: 'Smash any block, any time.' },
     { id: 'swap', icon: '⇄', name: 'Swap', price: 200, desc: 'Trade any two blocks, any time.' },
-    { id: 'heater', icon: '🔥', name: 'Heater', price: 250, desc: 'Thaws every frozen block. Pick it before a Frost Peaks level.' },
+    { id: 'heater', icon: '🔥', name: 'Heater', price: 250, desc: 'Thaws every frozen block before a Frost Peaks level (not on Thaw goals).' },
   ];
   function buy(price, then) {
     if (coins < price) { toast('Not enough coins'); return; }
