@@ -10,6 +10,7 @@ Build a level mode on the existing engine first, with small boards that grow fro
 | 3 | **Variety** *(built, now in playtesting)*: World 2 "Stone Quarry" (levels 25–36) with stone blockers, a seeded daily challenge, and 4 tile/board skins as coin sinks | New worlds still feel fresh |
 | 3b | **World 3: Frost Peaks** *(built, now in playtesting)*: levels 37–48 with frozen blocks (merge beside one to thaw it into a normal block), snowfall, ice + stones together, a free Heater booster sample on level 42, a Frost skin and a "thaw 50 blocks" milestone. Hard: 42; Super Hard: 47 | Tutorial levels 37–38 always won; finale about 50% for the bot |
 | 4 | Story: spend stars to restore an illustrated scene, one caption at a time | none |
+| 6 | **Quest Log: lifetime challenges** *(planned, see below)*: a growing list of long-term challenges with an overall % bar, rewards at completion milestones and hidden challenges that reveal themselves | Players check the Quest Log between levels |
 | 5 | **Store release (final polish)**: swap in the real art, monetisation, Android and iOS builds, store listings | Closed testing passes; both stores approve |
 
 ## Economy and difficulty (v2, from the coin research)
@@ -50,3 +51,36 @@ Target: first release next month. The game stays fully playable offline and in t
 6. Testing: Google requires a closed test (new personal accounts: around 12 testers for 14 days; check the current rule) before production access. Apple TestFlight for iOS. Plan to start this at the beginning of December for a late-December release.
 7. Review: Apple usually takes 1-3 days and may reject a plain wrapped website, so make sure the app works offline, has its own icon and splash screen, and feels native (haptics, no browser chrome).
 8. Launch checklist: crash-free run on real iPhone, Android phone and tablet; restore-purchases button; save data survives updates.
+
+## Phase 6 (planned): Quest Log, lifetime challenges
+
+A home-screen **Quest Log** for long-term goals that build up over all of play. It replaces and absorbs today's Milestones screen.
+
+**What the player sees**
+- An **overall completion bar** at the top: "Quest Log 37%". Hidden challenges count toward the total, so 100% really means everything.
+- Challenges grouped by theme, each with its **own progress bar** (e.g. "Thaw frozen blocks: 132 / 250").
+- **Hidden challenges** show as "❓ Hidden challenge" (optionally with a vague hint) and reveal themselves when a related challenge is done, a new world opens, or the player stumbles on them.
+- A red dot on the home-screen button when a challenge is completed and its reward hasn't been collected.
+
+**Themes (first set)**
+- *Merging:* total merges; a 5-block merge; combos of 5 / 8 / 10.
+- *Blocks:* first 2048 / 4K / 4M / ∞ (today's milestones move here).
+- *Levels:* stars earned; each world cleared; all 3 stars in a world; Hard and Super Hard levels cleared.
+- *Worlds:* stones broken; blocks thawed (today's "thaw 50" moves here); one set per new world (e.g. Honey Hive: honey stopped).
+- *Endless:* score 10K / 100K / 1M; ∞ blocks made.
+- *Daily:* dailies won (no streaks; a missed day never resets anything).
+- *Collection:* skins and style items owned.
+- *Hidden examples:* win a Super Hard level without boosters; win with exactly 0 shots left; thaw 3 blocks with one merge; make a 10-merge combo.
+
+**Tiers and rewards**
+- Many challenges have bronze / silver / gold steps (e.g. thaw 50 / 250 / 1,000), each paying a few coins.
+- A **reward track** on the overall count: every 5 challenges completed opens a chest (coins plus a booster); 25 / 50 / 75 / 100% unlock exclusive cosmetics (a skin, a shot trail, a merge effect, a gold "Quest Master" frame) that can't be bought.
+- Rewards are collected with a tap (the reveal moment), never auto-expire.
+
+**How it grows**
+- Each new world adds its own challenges (some hidden). The overall % is "completed / all challenges in the game so far", so a big update can lower it; show a "🆕 New challenges" badge so that reads as more to do, not lost progress.
+- Lifetime counters (merges, thaws, stones, stars …) are stored locally from the start, so challenges added later can count past play.
+
+**Rules (same as the design rules):** no time limits, nothing expires or resets, no paid shortcuts to complete a challenge.
+
+**Open questions for later:** per-world % as well as overall; whether coins from challenges count toward the coin economy targets (keep them small, the cosmetics are the real reward).
