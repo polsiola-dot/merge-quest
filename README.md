@@ -72,7 +72,10 @@ All need Playwright and run headless Chromium. `tools/bot.js` is the shared gree
 | `docs/roadmap.md` | Plan and design rules |
 | `docs/art-prompts.md` | Image prompts for the final artwork |
 | `fonts/` | Bundled Fredoka and Lilita One fonts |
+| `music/` | Background music (`home.mp3` loops on the home screen) |
 
 ## Credits
 
 Fonts: [Fredoka](https://fonts.google.com/specimen/Fredoka) and [Lilita One](https://fonts.google.com/specimen/Lilita+One), both under the SIL Open Font License, bundled in `fonts/` so the game works offline.
+
+Music: "Sunny Kingdom Walk" (home screen), made for Merge Quest with AI music tools. Check the generator's commercial-use terms before the store release.

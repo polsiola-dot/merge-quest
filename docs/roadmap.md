@@ -9,6 +9,7 @@ Build a level mode on the existing engine first, with small boards that grow fro
 | 2 | **Rewards** *(built)*: win-streak ladder (3 wins → free Hammer, 5 → + free Swap; a loss costs 2 steps), chests on levels 10 and 20 (coins + banked helpers), one-time bounties for the first 2048 / 4K / 4M / ∞, and a home screen to pick a mode | Players replay levels for 3 stars |
 | 3 | **Variety** *(built, now in playtesting)*: World 2 "Stone Quarry" (levels 25–36) with stone blockers, a seeded daily challenge, and 4 tile/board skins as coin sinks | New worlds still feel fresh |
 | 3b | **World 3: Frost Peaks** *(built, now in playtesting)*: levels 37–48 with frozen blocks (merge beside one to thaw it into a normal block), snowfall, ice + stones together, a free Heater booster sample on level 42, a Frost skin and a "thaw 50 blocks" milestone. Hard: 42; Super Hard: 47 | Tutorial levels 37–38 always won; finale about 50% for the bot |
+| 3c | **Audio** *(music started, SFX planned, see below)*: home-screen music loop with Music/Sound toggles in Settings *(done)*, then a gameplay ambient loop and sound effects | Sound never covers up the next move; muting persists |
 | 4 | Story: spend stars to restore an illustrated scene, one caption at a time | none |
 | 6 | **Quest Log: lifetime challenges** *(planned, see below)*: a growing list of long-term challenges with an overall % bar, rewards at completion milestones and hidden challenges that reveal themselves | Players check the Quest Log between levels |
 | 5 | **Store release (final polish)**: swap in the real art, monetisation, Android and iOS builds, store listings | Closed testing passes; both stores approve |
@@ -28,6 +29,46 @@ Build a level mode on the existing engine first, with small boards that grow fro
 - 2×2 only works with scripted tiles; random tiles start at 3×3. "Clear all blocks" is impossible, so use "leave ≤ N blocks".
 - Each helper is introduced with free uses before it costs coins.
 - Never: lives or energy timers, piggy banks, loot boxes, streaks that reset to zero, guilt notifications.
+
+## Audio plan
+
+**Done:** `music/home.mp3` ("Sunny Kingdom Walk", 59 s, 128 kbps). The end is crossfaded into the start so the loop has no seam. It plays through Web Audio, starting on the first tap (browsers block sound before one), fades in on the home screen and level map, fades out when a game starts, and pauses when the app is in the background. Settings has **Music** and **Sound** on/off toggles, saved in `mergeQuest.audio.v1`. The service worker caches the file for offline play.
+
+**Next music:** a calm, sparse ambient gameplay loop (prompt already written) at about 40–50% of the home volume, crossfading from the home theme when a level starts. World variants for Stone Quarry and Frost Peaks can follow later.
+
+### Sound effects: approach
+- **One mixer.** Music and SFX each get their own gain node into a master gain, so each toggle is independent. Effects briefly duck the music by about 30% for big moments only (win, chest, 1024+).
+- **Short files, preloaded.** All effects are decoded once into memory after the first tap. Target 0.1–1.5 s each, mono OGG/MP3 at 96 kbps, about 300 KB in total. A tiny synthesised fallback (oscillator blips) covers each sound until its file exists, so the plan can be built and tuned now and the real sounds dropped in later with no code changes.
+- **Pitch tells the story.** Merge sounds rise in pitch with the tile value and with each step of a chain combo (about +2 semitones per step, capped), so players can *hear* a good move. Each play gets a little random pitch (±3%) so repeats never sound robotic.
+- **Limits.** At most 2 copies of the same sound at once and at most 6 voices in total; very quiet sounds are skipped while a big one plays.
+- **Haptics (in the app builds).** Light tap on fire, medium on merge, success pattern on win, through Capacitor Haptics in Phase 5. Linked to the Sound toggle, with its own toggle later if players ask.
+
+### Sound list (priority order)
+| # | Moment | Sound idea | Notes |
+| --- | --- | --- | --- |
+| 1 | **Fire / tile lands** | soft wooden "tok" or plop | Plays most often, so keep it the quietest and shortest |
+| 2 | **Merge** | bright pop + marimba note | Pitch rises with tile value |
+| 3 | **Chain combo** | same pop, stepping up a scale | Each extra step in a chain climbs higher; 4+ adds a sparkle |
+| 4 | **Group merge (3+ blocks)** | chord stab instead of a single note | Bigger group → fuller chord |
+| 5 | **Big tile (1024, 2048, K/M)** | short fanfare + shimmer | Ducks the music |
+| 6 | **Level won** | 2–3 s jingle (horn + glockenspiel, same key as the home theme) | Stars pop in one by one with rising "ding"s |
+| 7 | **Level lost / out of shots** | gentle descending "womp" on pizzicato | Sad but friendly, never harsh |
+| 8 | **Coins earned / coin fly-in** | coin clinks, one per flying coin, capped | Satisfying payoff; matches the coin animation |
+| 9 | **Button tap / menu** | very soft click | Used everywhere in the UI |
+| 10 | **Open card / close (✕)** | soft whoosh in, softer whoosh out | Also the goal card |
+| 11 | **Stone crack / break** | rock crack, then crumble | Stone Quarry |
+| 12 | **Ice thaw** | crystalline crack + drip | Frost Peaks; snowfall gets a soft "whump" |
+| 13 | **Boosters** | Hammer: thunk; Swap: whoosh; Undo: rewind blip; Wild Tile: magic sparkle; Heater: warm sizzle | Locked helper tap: dull "bonk" |
+| 14 | **Shop purchase** | cash-register "ka-ching" | Equip a cosmetic: soft sparkle |
+| 15 | **Chest open / daily reward** | lid creak + treasure shimmer | Ducks the music |
+| 16 | **Milestone / streak reward** | short rising arpeggio | Streak broken: no sound (don't rub it in) |
+| 17 | **Low shots warning (≤3 left)** | soft heartbeat tick per shot | Builds tension without stress |
+
+### Build order
+1. Mixer + `sfx(name, {pitch})` helper with the synthesised fallbacks, wired to sounds 1–9. Test on a phone for volume balance.
+2. Generate the real sounds (ElevenLabs Sound Effects, or a free CC0 pack), trim, normalise to about −16 LUFS, and drop them into `sfx/`.
+3. Sounds 10–17, plus the gameplay ambient loop.
+4. Phase 5: haptics and a volume slider.
 
 ## Phase 5: store release
 

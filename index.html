@@ -306,6 +306,11 @@
     font-family: "Fredoka", system-ui, sans-serif;
   }
   #home.show { display: block; }
+  .set-toggles { display: flex; gap: 8px; }
+  .set-toggles .set-tg { flex: 1; display: flex; justify-content: space-between; align-items: center; gap: 8px; opacity: .65; }
+  .set-toggles .set-tg.on { opacity: 1; }
+  .set-tg b { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.12); }
+  .set-tg.on b { background: #3ecf6e; color: #0b2a14; }
   #home .scene { position: absolute; inset: 0; width: 100%; height: 100%; }
   .home-in {
     position: relative; height: 100%; max-width: 480px; margin: 0 auto;
@@ -2141,6 +2146,7 @@
         <button id="hHelp">${ICONS.book}Help</button>
       </div>`;
     $('home').classList.add('show');
+    music.play();
     $('hPlay').onclick = () => (cont ? resumeLevel() : next ? startLevel(next) : playEndless());
     $('hMap').onclick = showMap;
     $('hEndless').onclick = playEndless;
@@ -2268,10 +2274,16 @@
     const hasEndless = !!store.get(SAVE_KEY), cont = savedLevel();
     showOverlay(`
       <h2>Settings</h2>
+      <div class="set-toggles">
+        <button id="sMusic" class="set-tg${audioPrefs.music ? ' on' : ''}">🎵 Music<b>${audioPrefs.music ? 'On' : 'Off'}</b></button>
+        <button id="sSfx" class="set-tg${audioPrefs.sfx ? ' on' : ''}">🔊 Sound<b>${audioPrefs.sfx ? 'On' : 'Off'}</b></button>
+      </div>
       ${cont ? `<button id="sRestartLv">↻ Restart Level ${cont}</button>` : ''}
       ${hasEndless ? '<button id="sNewEndless">∞ Start a new Endless game</button>' : ''}
       <button id="sReset">Reset all progress…</button>
       <button class="primary" id="closeBtn">Close</button>`, '', { close: hideOverlay });
+    $('sMusic').onclick = () => { audioPrefs.music = !audioPrefs.music; saveAudio(); music.unlock(); music.update(); showSettings(); };
+    $('sSfx').onclick = () => { audioPrefs.sfx = !audioPrefs.sfx; saveAudio(); showSettings(); };
     if (cont) $('sRestartLv').onclick = () => startLevel(cont);
     if (hasEndless) $('sNewEndless').onclick = () => { if (levelish()) save(); newGame(); };
     $('sReset').onclick = () => {
@@ -2288,7 +2300,7 @@
     };
     $('closeBtn').onclick = hideOverlay;
   }
-  function hideHome() { $('home').classList.remove('show'); }
+  function hideHome() { $('home').classList.remove('show'); music.stop(); }
 
   function resumeLevel() {
     if (mode !== 'level') save();       // keep the Endless run or daily attempt
@@ -3422,6 +3434,66 @@
   if (window.visualViewport) visualViewport.addEventListener('resize', onResize);
   if (window.ResizeObserver) new ResizeObserver(onResize).observe(wrap);
 
+  // ---------- audio ----------
+  // Web Audio for gapless looping. The context starts on the first tap (browsers
+  // block sound before that). Music follows the home screen: it fades in while
+  // home is showing and out when a game starts. Settings has Music and Sound toggles.
+  const AUDIO_KEY = 'mergeQuest.audio.v1';
+  const audioPrefs = (() => { try { return { music: true, sfx: true, ...JSON.parse(store.get(AUDIO_KEY) || '{}') }; } catch (e) { return { music: true, sfx: true }; } })();
+  const MUSIC_VOL = 0.55, FADE = 0.8;
+  const music = {
+    ctx: null, gain: null, buf: null, src: null, loading: null, want: false,
+    unlock() {
+      if (this.ctx) { if (this.ctx.state === 'suspended' && !document.hidden) this.ctx.resume().catch(() => {}); return; }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      this.gain = this.ctx.createGain(); this.gain.gain.value = 0; this.gain.connect(this.ctx.destination);
+      this.update();
+    },
+    load() {
+      if (!this.loading) this.loading = fetch('music/home.mp3').then(r => r.arrayBuffer())
+        .then(b => new Promise((ok, no) => this.ctx.decodeAudioData(b, ok, no)))
+        .then(buf => { this.buf = buf; this.update(); })
+        .catch(() => { this.loading = null; });
+      return this.loading;
+    },
+    // edges of the decoded audio, skipping MP3 encoder silence so the loop has no gap
+    bounds(buf) {
+      const d = buf.getChannelData(0), n = d.length, eps = 1e-4;
+      let a = 0, b = n - 1;
+      while (a < n && Math.abs(d[a]) < eps) a++;
+      while (b > a && Math.abs(d[b]) < eps) b--;
+      return [a / buf.sampleRate, (b + 1) / buf.sampleRate];
+    },
+    update() {
+      const on = this.want && audioPrefs.music && !document.hidden;
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime, g = this.gain.gain;
+      g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
+      if (on) {
+        if (!this.buf) { this.load(); return; }
+        if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+        if (!this.src) {
+          const src = this.ctx.createBufferSource(), [a, b] = this.bounds(this.buf);
+          src.buffer = this.buf; src.loop = true; src.loopStart = a; src.loopEnd = b;
+          src.connect(this.gain); src.start(0, a);
+          this.src = src;
+        }
+        g.linearRampToValueAtTime(MUSIC_VOL, t + FADE);
+      } else if (this.src) {
+        const src = this.src; this.src = null;
+        g.linearRampToValueAtTime(0, t + FADE);
+        src.stop(t + FADE + 0.05);
+      }
+    },
+    play() { this.want = true; this.update(); },
+    stop() { this.want = false; this.update(); },
+  };
+  function saveAudio() { store.set(AUDIO_KEY, JSON.stringify(audioPrefs)); }
+  for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => music.unlock(), { capture: true });
+  document.addEventListener('visibilitychange', () => music.update());
+
   // ---------- boot ----------
   layout();
   if (!load()) { mode = 'endless'; if (!load()) newGame(); }
@@ -3445,7 +3517,7 @@
   window.__mb = {
     fire, swap, newGame, undo, toggleTool, useToolAt, comboCoins, rollValue, startLevel, showMap, playEndless, LEVELS,
     showHome, resumeLevel, showMilestones, startDaily, dailyDef, todayKey, playDaily, showShop, applySkin,
-    setCoins,
+    setCoins, music, audioPrefs,
     state: () => ({ grid: gridValues(), cur, nxt, nxt2, score, over, busy, coins, tool, sel, snap: !!snap, maxV, infCount, minE, mode, lv, cols, rows, freeUses, inv: { ...inv } }),
   };
 })();
