@@ -1022,6 +1022,7 @@
   }
 
   function coinLanded(f, tx, ty) {
+    sfx.play('coin');
     coinPending = Math.max(0, coinPending - f.value);
     updateHud();
     const w = $('wallet');
@@ -1190,11 +1191,15 @@
       elapsed = arrive;
       if (i < sources.length - 1) {    // intermediate step: count up with a small gulp
         target.show = Math.min(INF, old * Math.pow(2, i + 1));
+        sfx.play('gulp', { v: target.show, step: chainStep + 1 });
         target.s = 1.1 + (ramp ? i * 0.03 : 0);
         target.wob = { amp: 0.08, t: 0 };
       }
     }
     target.show = undefined;
+    chainStep++;
+    sfx.play('merge', { v: newV, group: sources.length + 1, step: chainStep });
+    if (newV >= 1024 && old < 1024) sfx.play('big');
     target.s = 1.24;
     target.wob = { amp: 0.16, t: 0 };
     if (newV >= INF && old < INF) infinityMade(target);
@@ -1860,6 +1865,7 @@
   function levelWon() {
     over = true; tool = null; sel = null; snap = null;
     lv.result = 'won';
+    sfx.play('win');
     if (mode === 'daily') return dailyWon();
     const L = levelDef(), n = lv.n, stars = starsFor();
     const pr = loadProgress(), prev = pr.stars[n];
@@ -1947,6 +1953,7 @@
   function levelLost(why) {
     over = true; tool = null; sel = null;
     lv.result = 'lost';
+    sfx.play('lose');
     if (mode === 'daily') return dailyLost(why);
     const n = lv.n, pr = loadProgress();
     lv.penalty = { streak: pr.streak, hit: !!lv.streakHit };   // undone if they continue
@@ -2618,6 +2625,7 @@
     updateHud();
 
     await sleep(dur * 1000 + (full ? 0 : 60));
+    sfx.play('land');
     if (t.v === WILD) {                // the Wild Tile picks its value on landing
       t.v = full ? grid[c][r].v : wildPick(c, r);
       t.s = 1.25; t.wob = { amp: 0.2, t: 0 };
@@ -2648,6 +2656,7 @@
 
   function finishTurn() {
     busy = false;
+    chainStep = 0;
     // the board has settled: re-check previewed tiles (e.g. a value whose only
     // match was just merged away, or that now exceeds the biggest block)
     if (!launchable(cur)) { cur = rollValue(); shooter.v = cur; shooter.s = 0.6; }
@@ -2937,6 +2946,7 @@
   function gameOver() {
     if (levelish()) return levelLost('No room left');
     over = true;
+    sfx.play('lose');
     tool = null; sel = null;
     save();
     const rank = rankFor(score);
@@ -3660,7 +3670,8 @@
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       this.ctx = new AC();
-      this.gain = this.ctx.createGain(); this.gain.gain.value = 0; this.gain.connect(this.ctx.destination);
+      this.duckNode = this.ctx.createGain(); this.duckNode.connect(this.ctx.destination);
+      this.gain = this.ctx.createGain(); this.gain.gain.value = 0; this.gain.connect(this.duckNode);
       this.update();
     },
     load() {
@@ -3699,6 +3710,15 @@
         src.stop(t + FADE + 0.05);
       }
     },
+    // lower the music briefly under a big sound effect
+    duck(secs, depth = 0.35) {
+      if (!this.duckNode) return;
+      const g = this.duckNode.gain, t = this.ctx.currentTime;
+      g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
+      g.linearRampToValueAtTime(1 - depth, t + 0.08);
+      g.setValueAtTime(1 - depth, t + secs);
+      g.linearRampToValueAtTime(1, t + secs + 0.6);
+    },
     play() { this.want = true; this.update(); },
     stop() { this.want = false; this.update(); },
   };
@@ -3717,6 +3737,133 @@
   applyMotion();
   for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => music.unlock(), { capture: true });
   document.addEventListener('visibilitychange', () => music.update());
+
+
+  // ---------- sound effects ----------
+  // Synthesised placeholders for now. To use real sounds later, put files in
+  // sfx/ and list them in sfx/index.json, e.g. {"merge": "merge.mp3"}: a file
+  // replaces its synth with no code changes (pitch still follows the game).
+  const sfx = (() => {
+    let out = null, files = {}, loading = false, voices = [], lastCoin = 0;
+    const PENTA = [0, 2, 4, 7, 9];                 // C major pentatonic: every mix sounds friendly
+    const noteHz = i => 523.25 * Math.pow(2, (12 * Math.floor(i / 5) + PENTA[((i % 5) + 5) % 5]) / 12);
+    const wobble = () => 1 + (Math.random() - 0.5) * 0.06;   // ±3% so repeats never sound robotic
+    function ctx() {
+      const c = music.ctx;
+      if (!c || c.state !== 'running' || !audioPrefs.sfx) return null;
+      if (!out) { out = c.createGain(); out.gain.value = 0.8; out.connect(c.destination); loadFiles(c); }
+      return c;
+    }
+    function loadFiles(c) {
+      if (loading) return; loading = true;
+      fetch('sfx/index.json').then(r => r.ok ? r.json() : {}).then(list => {
+        for (const [name, file] of Object.entries(list)) fetch('sfx/' + file).then(r => r.arrayBuffer())
+          .then(b => new Promise((ok, no) => c.decodeAudioData(b, ok, no))).then(buf => { files[name] = buf; }).catch(() => {});
+      }).catch(() => {});
+    }
+    // At most 2 of one sound and 6 in total at once; big moments always play.
+    function room(name, dur, must) {
+      const now = performance.now();
+      voices = voices.filter(v => v.end > now);
+      if (!must && (voices.length >= 6 || voices.filter(v => v.name === name).length >= 2)) return false;
+      voices.push({ name, end: now + dur * 1000 });
+      return true;
+    }
+    function tone(c, t, f, dur, { type = 'sine', gain = 0.3, attack = 0.004, f2 } = {}) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur * 0.6);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.02);
+    }
+    function noise(c, t, dur, freq, gain) {
+      const n = Math.floor(c.sampleRate * dur), b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const src = c.createBufferSource(), bp = c.createBiquadFilter(), g = c.createGain();
+      bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = 1.2; g.gain.value = gain;
+      src.buffer = b; src.connect(bp); bp.connect(g); g.connect(out); src.start(t);
+    }
+    const marimba = (c, t, f, gain = 0.28, dur = 0.45) => {   // woody note: body + a quick bright overtone
+      tone(c, t, f, dur, { gain });
+      tone(c, t, f * 3.9, 0.09, { gain: gain * 0.35 });
+    };
+    function file(c, name, rate = 1, gain = 1) {
+      const src = c.createBufferSource(), g = c.createGain();
+      src.buffer = files[name]; src.playbackRate.value = rate; g.gain.value = gain;
+      src.connect(g); g.connect(out); src.start();
+      return files[name].duration / rate;
+    }
+    const synth = {
+      tap(c, t) { tone(c, t, 700 * wobble(), 0.05, { gain: 0.05, f2: 520 }); return 0.05; },
+      land(c, t) {   // soft wooden "tok"
+        tone(c, t, 230 * wobble(), 0.11, { gain: 0.2, f2: 120 });
+        noise(c, t, 0.03, 2400, 0.08);
+        return 0.12;
+      },
+      gulp(c, t, o) {   // a block being absorbed into a group merge: climbing blips
+        tone(c, t, noteHz(o.idx) * wobble(), 0.12, { gain: 0.12, type: 'triangle' });
+        return 0.12;
+      },
+      merge(c, t, o) {
+        const f = noteHz(o.idx) * wobble();
+        tone(c, t, f * 0.7, 0.08, { gain: 0.14, f2: f * 1.6 });           // bubble pop
+        if (o.group >= 3) [0, 2, 4, 5].slice(0, Math.min(4, o.group)).forEach((k, i) => marimba(c, t + 0.01 * i, noteHz(o.idx + k), 0.13));
+        else marimba(c, t + 0.015, f);
+        if (o.step >= 4) for (let i = 0; i < 4; i++) tone(c, t + 0.06 + i * 0.05, 2200 + Math.random() * 1800, 0.12, { gain: 0.05 });
+        return 0.5;
+      },
+      big(c, t) {   // short fanfare + shimmer for 1024 and up
+        [0, 2, 4, 5].forEach((k, i) => tone(c, t + i * 0.09, noteHz(k + 5), 0.35, { type: 'triangle', gain: 0.2 }));
+        for (let i = 0; i < 8; i++) tone(c, t + 0.35 + i * 0.04, 2600 + Math.random() * 2400, 0.25, { gain: 0.04 });
+        music.duck(1.2);
+        return 0.9;
+      },
+      win(c, t) {   // little jingle, same key as the home theme loop
+        const mel = [[0, 0], [2, .14], [4, .28], [5, .42], [4, .62], [5, .76]];
+        mel.forEach(([k, d], i) => {
+          const last = i === mel.length - 1;
+          tone(c, t + d, noteHz(k), last ? 1.0 : 0.3, { type: 'triangle', gain: 0.22 });
+          tone(c, t + d, noteHz(k + 10), last ? 0.8 : 0.2, { gain: 0.06 });    // glockenspiel sparkle
+        });
+        [0, 2, 4].forEach(k => tone(c, t + 0.76, noteHz(k - 5), 1.1, { gain: 0.1 }));
+        music.duck(2.2, 0.5);
+        return 1.8;
+      },
+      lose(c, t) {   // gentle descending "womp" on plucks, sad but friendly
+        [4, 2, 0].forEach((k, i) => tone(c, t + i * 0.22, noteHz(k - 5), 0.35, { type: 'triangle', gain: 0.18 }));
+        tone(c, t + 0.66, noteHz(-6), 0.7, { type: 'triangle', gain: 0.16, f2: noteHz(-8) });
+        music.duck(1.6, 0.5);
+        return 1.4;
+      },
+      coin(c, t) {
+        tone(c, t, 1976 * wobble(), 0.16, { gain: 0.08 });
+        tone(c, t + 0.035, 2637 * wobble(), 0.2, { gain: 0.07 });
+        return 0.2;
+      },
+    };
+    const MUST = { win: 1, lose: 1, big: 1 };
+    return {
+      // name: tap | land | gulp | merge | big | win | lose | coin
+      // o: { v (tile value), group (blocks in the merge), step (merge number this turn), idx }
+      play(name, o = {}) {
+        const c = ctx(); if (!c) return;
+        if (name === 'coin') { const now = performance.now(); if (now - lastCoin < 45) return; lastCoin = now; }
+        if (o.v) o.idx = Math.min(12, Math.round((Math.log2(o.v) - 1) * 0.6)) + Math.min(6, (o.step || 1) - 1);
+        if (!room(name, 0.4, MUST[name])) return;
+        if (files[name]) {
+          const rate = o.idx !== undefined ? Math.pow(2, (o.idx * 2.4) / 12) : wobble();   // ~2 semitones per step
+          file(c, name, rate);
+          if (name === 'big' || name === 'win' || name === 'lose') music.duck(name === 'big' ? 1.2 : 2);
+          return;
+        }
+        synth[name](c, c.currentTime + 0.005, o);
+      },
+    };
+  })();
+  let chainStep = 0;                    // merges so far this turn: each one pitches a little higher
+  document.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('button')) sfx.play('tap'); });
 
   // ---------- boot ----------
   layout();
@@ -3751,7 +3898,7 @@
   window.__mb = {
     fire, swap, newGame, undo, toggleTool, useToolAt, comboCoins, rollValue, startLevel, showMap, playEndless, LEVELS,
     showHome, resumeLevel, showMilestones, startDaily, dailyDef, todayKey, playDaily, showShop, applySkin,
-    setCoins, music, audioPrefs, buddyCtl,
+    setCoins, music, audioPrefs, buddyCtl, sfx,
     state: () => ({ grid: gridValues(), cur, nxt, nxt2, score, over, busy, coins, tool, sel, snap: !!snap, maxV, infCount, minE, mode, lv, cols, rows, freeUses, inv: { ...inv } }),
   };
 })();

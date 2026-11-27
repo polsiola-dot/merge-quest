@@ -9,7 +9,7 @@ Build a level mode on the existing engine first, with small boards that grow fro
 | 2 | **Rewards** *(built)*: win-streak ladder (3 wins → free Hammer, 5 → + free Swap; a loss costs 2 steps), chests on levels 10 and 20 (coins + banked helpers), one-time bounties for the first 2048 / 4K / 4M / ∞, and a home screen to pick a mode | Players replay levels for 3 stars |
 | 3 | **Variety** *(built, now in playtesting)*: World 2 "Stone Quarry" (levels 25–36) with stone blockers, a seeded daily challenge, and 4 tile/board skins as coin sinks | New worlds still feel fresh |
 | 3b | **World 3: Frost Peaks** *(built, now in playtesting)*: levels 37–48 with frozen blocks (merge beside one to thaw it into a normal block), snowfall, ice + stones together, a free Heater booster sample on level 42, a Frost skin and a "thaw 50 blocks" milestone. Hard: 42; Super Hard: 47 | Tutorial levels 37–38 always won; finale about 50% for the bot |
-| 3c | **Audio** *(music started, SFX planned, see below)*: home-screen music loop with Music/Sound toggles in Settings *(done)*, then a gameplay ambient loop and sound effects | Sound never covers up the next move; muting persists |
+| 3c | **Audio** *(home music and placeholder SFX done, see below)*: home-screen music loop with Music/Sound toggles in Settings *(done)*, then a gameplay ambient loop and sound effects | Sound never covers up the next move; muting persists |
 | 4 | Story: spend stars to restore an illustrated scene, one caption at a time | none |
 | 6 | **Quest Log: lifetime challenges** *(planned, see below)*: a growing list of long-term challenges with an overall % bar, rewards at completion milestones and hidden challenges that reveal themselves | Players check the Quest Log between levels |
 | 5 | **Store release (final polish)**: swap in the real art, monetisation, Android and iOS builds, store listings | Closed testing passes; both stores approve |
@@ -65,7 +65,7 @@ Build a level mode on the existing engine first, with small boards that grow fro
 | 17 | **Low shots warning (≤3 left)** | soft heartbeat tick per shot | Builds tension without stress |
 
 ### Build order
-1. Mixer + `sfx(name, {pitch})` helper with the synthesised fallbacks, wired to sounds 1–9. Test on a phone for volume balance.
+1. *(done)* Mixer + `sfx.play(name, {v, group, step})` with synthesised placeholders, wired to sounds 1–9: land, merge (pitch follows the tile value and climbs with each chain step; 3+ block groups play a chord with climbing "gulps"; 4+ chains add a sparkle), big tile fanfare, win jingle, lose "womp", coin clinks and button taps. Big moments duck the music. Real sounds drop into `sfx/` and are listed in `sfx/index.json` (`{"merge": "merge.mp3"}`), replacing the synth with no code change. Next: balance volumes on a phone.
 2. Generate the real sounds (ElevenLabs Sound Effects, or a free CC0 pack), trim, normalise to about −16 LUFS, and drop them into `sfx/`.
 3. Sounds 10–17, plus the gameplay ambient loop.
 4. Phase 5: haptics and a volume slider.
