@@ -2311,6 +2311,7 @@
 
   function showHome() {
     if (busy) return;
+    if (updateReady) { if (levelish() && lv && !lv.result) save(); location.reload(); return; }
     clearCoinFlights();               // coins are already saved; skip the fly-in
     tool = null; sel = null;
     if (levelish() && lv && !lv.result) save();  // keep the attempt to continue
@@ -2510,6 +2511,7 @@
     };
     $('closeBtn').onclick = hideOverlay;
   }
+  let updateReady = false;   // a new version is waiting for the next visit home
   function hideHome() { $('home').classList.remove('show'); music.stop(); buddyCtl.stop(); }
 
   function resumeLevel() {
@@ -3732,7 +3734,17 @@
 
   // installable / offline when served over http(s)
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
+      // an app resumed from the background never reloads, so look for updates then too
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+    }).catch(() => {}));
+    // A new version took over: reload on the home screen, never in the middle of a level.
+    const hadSw = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadSw) return;                       // first install, nothing to refresh
+      if (homeOpen() && !busy) location.reload();
+      else updateReady = true;                  // showHome() reloads when the player gets there
+    });
   }
 
   // exposed for automated testing only
