@@ -25,6 +25,7 @@
     --accent: #ffd34d;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   html, body {
     height: 100%;
     height: 100dvh;
@@ -325,7 +326,8 @@
     box-shadow: 0 3px 0 rgba(20, 10, 60, .45);
   }
   .pill .ico { width: 32px; height: 32px; flex: none; }
-  .pill .val { min-width: 28px; padding-right: 6px; }
+  .pill { min-width: 0; flex: 0 1 auto; }
+  .pill .val { padding-right: 6px; white-space: nowrap; }
   .pill-plus {
     width: 28px; height: 28px; padding: 0; flex: none; border-radius: 8px; font: 700 20px/1 "Fredoka", sans-serif;
     background: linear-gradient(#ffe066, #ffbe1a); color: #6b3a00; box-shadow: 0 3px 0 #c78400;
@@ -375,7 +377,7 @@
   .b8 { right: 4%; bottom: 10%; width: 24%; transform: rotate(7deg); }
   .cast .buddy { max-height: 70%; }
   .cta {
-    position: relative; display: flex; align-items: center; justify-content: center; gap: 18px;
+    flex: none; position: relative; display: flex; align-items: center; justify-content: center; gap: 18px;
     height: clamp(74px, 11vh, 96px); border-radius: 999px; padding: 0 24px; margin: 0 4px;
     background: linear-gradient(#fff07a, #ffd21f 45%, #ffb800);
     border: 4px solid #ffe066; color: #2b1660;
@@ -404,7 +406,7 @@
   .mcard.m-en .mt small { color: #fff6a8; }
   .mcard .chev { font: 700 26px/1 "Fredoka", sans-serif; opacity: .9; }
   .dcard {
-    display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: -4px 0 14px; border-radius: 20px;
+    flex: none; display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: -4px 0 14px; border-radius: 20px;
     color: #fff; text-align: left; border: 3px solid rgba(255,255,255,.35);
     background: linear-gradient(#ff9a3d, #f2611d); box-shadow: 0 6px 0 #a33a0b, 0 10px 18px rgba(80, 30, 10, .35);
   }
@@ -424,9 +426,11 @@
     flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 10px;
     border-radius: 20px; background: linear-gradient(#6a4be0, #5233c4); border: 2px solid rgba(255,255,255,.2);
     box-shadow: 0 4px 0 #24135f; color: #fff; font: 600 15px "Fredoka", sans-serif;
+    flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis;
   }
+  .dock svg { flex: none; }
   .dock svg { width: 42px; height: 42px; }
-  @media (max-width: 400px) {
+  @media (max-width: 440px) {
     .mcard .chev { display: none; }
     .mcard { gap: 6px; }
   }
@@ -442,6 +446,31 @@
     .dock { padding-top: 8px; gap: 8px; }
     .dock button { flex-direction: row; justify-content: center; gap: 6px; padding: 8px 4px; font-size: 13px; border-radius: 14px; }
     .dock svg { width: 24px; height: 24px; }
+  }
+  /* narrow phones (and Android's larger-text setting, which narrows the page) */
+  @media (max-width: 390px) {
+    .home-in { padding-left: 10px; padding-right: 10px; }
+    .h-top { gap: 6px; }
+    .pill { height: 36px; gap: 5px; font-size: 16px; padding: 0 4px 0 3px; }
+    .pill .ico { width: 26px; height: 26px; }
+    .pill-plus { width: 24px; height: 24px; font-size: 17px; }
+    .gear { width: 38px; height: 38px; }
+    .gear svg { width: 22px; height: 22px; }
+    .dock { margin: 0 -10px; padding-left: 8px; padding-right: 8px; gap: 6px; }
+    .dock button { flex-direction: column; gap: 2px; padding: 6px 2px 7px; font-size: 12px; border-radius: 14px; }
+    .dock svg { width: 26px; height: 26px; }
+    .modes { gap: 8px; }
+    .mcard svg.mi { width: 34px; height: 34px; }
+  }
+  @media (max-width: 340px) {
+    .h-top { gap: 4px; }
+    .pill { font-size: 14px; gap: 3px; }
+    .pill .val { padding-right: 4px; }
+    .pill .ico { width: 22px; height: 22px; }
+    .pill-plus { display: none; }
+    .dock button { font-size: 10.5px; }
+    .mcard .mt b { font-size: 18px; }
+    .dcard .badge { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     .burst, .buddy .bob, .buddy .arm, .cta, .twinkle { animation: none; }
