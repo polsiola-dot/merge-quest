@@ -307,11 +307,12 @@
     font-family: "Fredoka", system-ui, sans-serif;
   }
   #home.show { display: block; }
-  .set-toggles { display: flex; gap: 8px; }
-  .set-toggles .set-tg { flex: 1; display: flex; justify-content: space-between; align-items: center; gap: 8px; opacity: .65; }
+  .set-toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .set-toggles .set-tg { flex: 1 1 40%; display: flex; justify-content: space-between; align-items: center; gap: 8px; opacity: .65; }
   .set-toggles .set-tg.on { opacity: 1; }
   .set-tg b { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.12); }
   .set-tg.on b { background: #3ecf6e; color: #0b2a14; }
+  .set-note { font-size: 12px !important; margin: -2px 0 2px; }
   #home .scene { position: absolute; inset: 0; width: 100%; height: 100%; }
   .home-in {
     position: relative; height: 100%; max-width: 480px; margin: 0 auto;
@@ -472,9 +473,8 @@
     .mcard .mt b { font-size: 18px; }
     .dcard .badge { display: none; }
   }
-  @media (prefers-reduced-motion: reduce) {
-    .burst, .buddy .bob, .buddy .arm, .cta, .twinkle { animation: none; }
-  }
+  /* html.calm: the phone asks for less motion (or Settings > Motion is off) */
+  html.calm .burst, html.calm .buddy .bob, html.calm .buddy .arm, html.calm .cta, html.calm .twinkle { animation: none; }
   /* ---------- skins ---------- */
   .skins { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .skin { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 16px; background: rgba(255,255,255,.06); border: 2px solid transparent; }
@@ -2097,7 +2097,7 @@
     stop() { this.gen++; this.timers.forEach(clearTimeout); this.timers = []; this.list = []; },
     start() {
       this.stop();
-      const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const calm = calmMotion();
       this.list = [...document.querySelectorAll('#home .buddy')].map(el => {
         const svg = el.querySelector('svg'), kind = svg.getAttribute('class').slice(2);
         const q = c => [...svg.querySelectorAll(c)];
@@ -2484,13 +2484,16 @@
       <div class="set-toggles">
         <button id="sMusic" class="set-tg${audioPrefs.music ? ' on' : ''}">🎵 Music<b>${audioPrefs.music ? 'On' : 'Off'}</b></button>
         <button id="sSfx" class="set-tg${audioPrefs.sfx ? ' on' : ''}">🔊 Sound<b>${audioPrefs.sfx ? 'On' : 'Off'}</b></button>
+        <button id="sMotion" class="set-tg${calmMotion() ? '' : ' on'}">✨ Motion<b>${calmMotion() ? 'Off' : 'On'}</b></button>
       </div>
+      ${calmMotion() && motionPref() === null ? '<p class="set-note">Animations are off because your phone asks apps to reduce motion (often its "Remove animations" or battery saver setting). Tap Motion to turn them on in this game.</p>' : ''}
       ${cont ? `<button id="sRestartLv">↻ Restart Level ${cont}</button>` : ''}
       ${hasEndless ? '<button id="sNewEndless">∞ Start a new Endless game</button>' : ''}
       <button id="sReset">Reset all progress…</button>
       <button class="primary" id="closeBtn">Close</button>`, '', { close: hideOverlay });
     $('sMusic').onclick = () => { audioPrefs.music = !audioPrefs.music; saveAudio(); music.unlock(); music.update(); showSettings(); };
     $('sSfx').onclick = () => { audioPrefs.sfx = !audioPrefs.sfx; saveAudio(); showSettings(); };
+    $('sMotion').onclick = () => { setMotionPref(calmMotion() ? 'on' : 'off'); showSettings(); };
     if (cont) $('sRestartLv').onclick = () => startLevel(cont);
     if (hasEndless) $('sNewEndless').onclick = () => { if (levelish()) save(); newGame(); };
     $('sReset').onclick = () => {
@@ -3698,6 +3701,18 @@
     stop() { this.want = false; this.update(); },
   };
   function saveAudio() { store.set(AUDIO_KEY, JSON.stringify(audioPrefs)); }
+  // Motion: follows the phone's reduce-motion request unless Settings overrides it.
+  const MOTION_KEY = 'mergeQuest.motion.v1';
+  const phoneCalm = matchMedia('(prefers-reduced-motion: reduce)');
+  const motionPref = () => { const v = store.get(MOTION_KEY); return v === 'on' || v === 'off' ? v : null; };
+  const calmMotion = () => motionPref() ? motionPref() === 'off' : phoneCalm.matches;
+  function applyMotion() {
+    document.documentElement.classList.toggle('calm', calmMotion());
+    if (homeOpen()) buddyCtl.start();
+  }
+  function setMotionPref(v) { store.set(MOTION_KEY, v); applyMotion(); }
+  phoneCalm.addEventListener?.('change', applyMotion);
+  applyMotion();
   for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => music.unlock(), { capture: true });
   document.addEventListener('visibilitychange', () => music.update());
 
