@@ -5,6 +5,7 @@ Build a level mode on the existing engine first, with small boards that grow fro
 | Phase | What | Gate to move on |
 | --- | --- | --- |
 | Now | Endless quick wins: bag randomiser, ∞ pays coins, two-tile preview, free rescue *(done)* | none |
+| Now | **Endless sliding pool** *(done)*: 6 block types that slide up instead of jumping a tier at 4K. At 4K the 2s and 4s retire, then 2 more types per doubling (never closer than 64x below the biggest block); a type retires only once none of its blocks remain; nothing launched exceeds the biggest block. Bot from a 4K board: ~650 shots survived vs ~90 before, typical score 1.4M vs 419K | Runs past 4K feel like a steady climb |
 | 1 | **Level mode MVP** *(built, now in playtesting)*: variable board size, 24 teaching levels, goals + shot limits + 1–3 stars, level map, free helper samples | Bot wins levels 1–6 every time; a new player finishes 1–12 without help |
 | 2 | **Rewards** *(built)*: win-streak ladder (3 wins → free Hammer, 5 → + free Swap; a loss costs 2 steps), chests on levels 10 and 20 (coins + banked helpers), one-time bounties for the first 2048 / 4K / 4M / ∞, and a home screen to pick a mode | Players replay levels for 3 stars |
 | 3 | **Variety** *(built, now in playtesting)*: World 2 "Stone Quarry" (levels 25–36) with stone blockers, a seeded daily challenge, and 4 tile/board skins as coin sinks | New worlds still feel fresh |

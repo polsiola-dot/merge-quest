@@ -865,7 +865,7 @@
   // top follows. A type only retires once none of its blocks are left on the
   // board; until then it keeps coming at ordinary odds. Nothing launched is ever
   // bigger than the biggest block on the board.
-  let poolSpeed = 1;                 // bottom types retired per doubling after 4K (tested: 1 and 2)
+  let poolSpeed = 2;                 // bottom types retired per doubling after 4K (2 tested best: longer runs, steady progress)
   function boardMaxE() {
     let m = 0;
     for (const t of allTiles()) if (t.v > 0 && t.v < INF) m = Math.max(m, log2(t.v));
@@ -3023,7 +3023,7 @@
         <li>🔥 <b>Hard</b> and 💀 <b>Super Hard</b> levels are marked on the map and pay ×2 and ×3 coins.</li>
         <li>The <b>🛒 Shop</b> has boosters, board skins, faces for your blocks, merge effects and shot trails.</li>
         <li>Switch (S) trades your current tile with the next one — free.</li>
-        <li>Three levels: <b>2–2048</b>, then <b>4K–2048K</b>, then <b>4M–2048M</b>, each with fancier blocks. Leftover blocks from the previous level keep turning up in the launcher until you've cleared them.</li>
+        <li>You're shot 6 kinds of block, starting with <b>2–64</b>, and never one bigger than your biggest block. At <b>4K</b> the 2s and 4s retire, and as your biggest block keeps doubling the smallest kinds retire and bigger ones join. A kind only retires once none of its blocks are left on the board. Blocks get fancier at 4K and 4M.</li>
         <li>Merge past 2048M to make an <b>∞ block</b> — the ultimate tile. Each new ∞ pays 500 coins, and two ∞ that touch clear away for 250 more. Your ∞ count is shown at the top.</li>
         <li>Stuck? Once per game you get a free Hammer to dig yourself out.</li>
         <li>Game ends when neither tile can be placed.</li>
