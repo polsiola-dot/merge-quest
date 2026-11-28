@@ -859,61 +859,64 @@
   // ---------- tile supply ----------
   // Current level from the biggest tile made: 0 until 4K, 1 until 4M, then 2.
   const tierOf = mv => Math.min(2, tierOfE(log2(mv)));
-  // Each level launches the previous level's 2048 plus 4…64 of its own units
-  // (2…64, then 2048/4K…64K, then 2048K/4M…64M). The top of the range opens up
-  // as your biggest tile grows; bigger values are rarer.
+  // The launch pool slides up as you progress. It's 6 block types in a row
+  // (2…64 to start). From 4K, the bottom 2 types retire, then POOL_SPEED more for
+  // each doubling of your biggest block (never closer than 64x below it), and the
+  // top follows. A type only retires once none of its blocks are left on the
+  // board; until then it keeps coming at ordinary odds. Nothing launched is ever
+  // bigger than the biggest block on the board.
+  let poolSpeed = 1;                 // bottom types retired per doubling after 4K (tested: 1 and 2)
   function boardMaxE() {
     let m = 0;
     for (const t of allTiles()) if (t.v > 0 && t.v < INF) m = Math.max(m, log2(t.v));
     return m;
   }
-  function spawnRange() {
-    const k = tierOf(maxV), lo = 10 * k + 1;
-    if (k === 0) return [lo, Math.min(lo + 5, Math.max(lo + 2, log2(maxV) - 1))];
-    // K and M levels: never launch anything bigger than the biggest block on the board
-    return [lo, Math.min(lo + 5, Math.max(lo, boardMaxE()))];
+  function poolTarget() {            // where the pool's bottom wants to be
+    const m = log2(maxV);
+    if (m < 12) return 1;
+    return Math.max(3, Math.min(3 + poolSpeed * (m - 12), m - 6));
   }
-  // Blocks left over from earlier levels (below this level's launch range).
-  function oldBlocks() {
-    const cut = Math.pow(2, spawnRange()[0]);
-    return allTiles().filter(t => t.v < cut).map(t => t.v);
+  // { lo, hi, keep }: the main window lo…hi (exponents) plus retiring types still on the board
+  function pool() {
+    const target = poolTarget(), m = log2(maxV);
+    const onBoard = new Set(allTiles().filter(t => t.v > 0 && t.v < INF).map(t => log2(t.v)));
+    minE = Math.max(1, minE || 1);
+    while (minE < target && !onBoard.has(minE)) minE++;           // retire types nothing needs any more
+    const keep = [];
+    for (let e = minE; e < target; e++) if (onBoard.has(e)) keep.push(e);
+    const hi = m < 12 ? Math.min(target + 5, Math.max(target + 2, m - 1))
+      : Math.min(target + 5, Math.max(target, boardMaxE()));
+    return { lo: target, hi, keep };
   }
 
   function rollValue() {
     if (levelish()) return levelRoll();
-    const [lo, hi] = spawnRange();
-    // While old-level blocks remain, often launch one of their values (more
-    // likely for values you have several of): ~70% at first, easing to ~30%
-    // as they get cleared. Only values actually on the board are used.
-    const old = oldBlocks();
-    if (old.length) {
-      oldStart = Math.max(oldStart, old.length);
-      const pOld = 0.3 + 0.4 * (old.length / oldStart);
-      if (Math.random() < pOld) return old[Math.floor(Math.random() * old.length)];
-    }
-    return drawFromBag(lo, hi);
+    return drawFromBag(pool());
   }
 
   // Is v still a legal launch? (used when a previewed tile moves up the queue)
   function launchable(v) {
     if (levelish()) return true;
-    const [lo, hi] = spawnRange();
-    if (v >= Math.pow(2, lo) && v <= Math.pow(2, hi)) return true;
-    return oldBlocks().includes(v);
+    const P = pool(), e = log2(v);
+    return (e >= P.lo && e <= P.hi) || P.keep.includes(e);
   }
 
   // Launches come from a shuffled bag of ~40 tiles built from the odds (each
   // step up 0.6x as likely), like Threes: no long floods or droughts of one value.
   // One bag serves the whole level; values currently above the cap (biggest
   // block on the board) stay in the bag for later instead of being drawn.
-  function drawFromBag(lo, hi) {
+  function drawFromBag(P) {
+    const key = P.lo + ':' + P.keep.join(',');
     for (let attempt = 0; attempt < 2; attempt++) {
-      if (bagKey !== String(lo) || !bag.length) {
-        bagKey = String(lo); bag = [];
-        let total = 0;
-        for (let e = lo; e <= lo + 5; e++) total += Math.pow(0.6, e - lo);
-        for (let e = lo; e <= lo + 5; e++) {
-          const n = Math.max(1, Math.round(Math.pow(0.6, e - lo) / total * 40));
+      if (bagKey !== key || !bag.length) {
+        bagKey = key; bag = [];
+        // weights: each step up 0.6x as likely; a retiring type counts like the 3rd step
+        const w = [];
+        for (let e = P.lo; e <= P.lo + 5; e++) w.push([e, Math.pow(0.6, e - P.lo)]);
+        for (const e of P.keep) w.push([e, 0.36]);
+        const total = w.reduce((t, [, x]) => t + x, 0);
+        for (const [e, x] of w) {
+          const n = Math.max(1, Math.round(x / total * 40));
           for (let k = 0; k < n; k++) bag.push(Math.pow(2, e));
         }
         for (let i = bag.length - 1; i > 0; i--) {
@@ -921,13 +924,13 @@
           [bag[i], bag[j]] = [bag[j], bag[i]];
         }
       }
-      const cap = Math.pow(2, hi);
+      const cap = Math.pow(2, P.hi);
       for (let i = bag.length - 1; i >= 0; i--) {
         if (bag.at(i) <= cap) return bag.splice(i, 1)[0];
       }
       bag = [];                          // only too-big values left: start a fresh bag
     }
-    return Math.pow(2, lo);
+    return Math.pow(2, P.lo);
   }
 
   // ---------- scoring / feedback ----------
@@ -2540,6 +2543,7 @@
     setGrid(d.g);
     ({ cur, nxt, score, maxV } = d);
     minE = d.minE || 1;
+    shownTier = tierOf(maxV);
     nxt2 = d.nxt2 || rollValue();       // tolerate saves missing newer fields
     oldStart = d.oldStart || 0;
     rescueUsed = !!d.rescueUsed;
@@ -2723,14 +2727,13 @@
     return merges;
   }
 
-  // Reaching a new level only announces it - blocks are never removed. Until the
-  // old level's blocks are cleared, the launcher keeps mixing in their values.
+  // Reaching 4K / 4M is announced; the pool itself slides in pool().
+  let shownTier = 0;
   function tierCheck() {
-    const want = 10 * tierOf(maxV) + 1;    // smallest value of the new tier's range
-    if (want <= minE) return;
-    minE = want;
-    oldStart = oldBlocks().length;
-    banner = { text: want >= 21 ? 'M blocks unlocked!' : 'K blocks unlocked!', life: 2.4 };
+    const k = tierOf(maxV);
+    if (k <= shownTier) return;
+    shownTier = k;
+    banner = { text: k >= 2 ? '4M! Bigger blocks ahead' : '4K! The 2s and 4s retire', life: 2.4 };
   }
 
   // Free: trade the current tile with the next one.
@@ -2859,7 +2862,7 @@
     cols = 5; rows = 7;
     layout();
     grid = Array.from({ length: cols }, () => Array(rows).fill(null));
-    score = 0; maxV = 2; minE = 1; oldStart = 0; over = false; busy = false;
+    score = 0; maxV = 2; minE = 1; oldStart = 0; shownTier = 0; over = false; busy = false;
     ghosts = []; floaters = []; flyers = []; bubbles = []; banner = null; praise = null;
     tool = null; sel = null; snap = null; lastEarned = 0;
     clearCoinFlights();
@@ -3898,7 +3901,7 @@
   window.__mb = {
     fire, swap, newGame, undo, toggleTool, useToolAt, comboCoins, rollValue, startLevel, showMap, playEndless, LEVELS,
     showHome, resumeLevel, showMilestones, startDaily, dailyDef, todayKey, playDaily, showShop, applySkin,
-    setCoins, music, audioPrefs, buddyCtl, sfx,
+    setCoins, music, audioPrefs, buddyCtl, sfx, pool, setPoolSpeed: n => { poolSpeed = n; bag = []; bagKey = ''; },
     state: () => ({ grid: gridValues(), cur, nxt, nxt2, score, over, busy, coins, tool, sel, snap: !!snap, maxV, infCount, minE, mode, lv, cols, rows, freeUses, inv: { ...inv } }),
   };
 })();
