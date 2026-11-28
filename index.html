@@ -2696,20 +2696,20 @@
 
       const [hc, hr] = hit;
       const mergeCells = groupOf(hc, hr);        // the whole connected group of equal blocks
-      // Merge into the topmost block of the group in the landing column: after the
-      // column settles the result lands in the same cell either way, but visually the
-      // lower bubbles rise into the upper one instead of it being dragged down.
-      let tr = hr;
-      for (const [gc, gr] of mergeCells) if (gc === hc && gr < tr) tr = gr;
-      const t = grid[hc][tr];
-      const ns = mergeCells.filter(([gc, gr]) => !(gc === hc && gr === tr))
-        .sort((a, b) => (Math.abs(a[0] - hc) + Math.abs(a[1] - tr)) - (Math.abs(b[0] - hc) + Math.abs(b[1] - tr)));
+      // Merge upwards: the result goes to the group's highest cell (nearest the top
+      // of the screen). On a tie, the one nearest the column the action happened in.
+      let [tc, tr] = mergeCells[0];
+      for (const [gc, gr] of mergeCells)
+        if (gr < tr || (gr === tr && Math.abs(gc - hc) < Math.abs(tc - hc))) { tc = gc; tr = gr; }
+      const t = grid[tc][tr];
+      const ns = mergeCells.filter(([gc, gr]) => !(gc === tc && gr === tr))
+        .sort((a, b) => (Math.abs(a[0] - tc) + Math.abs(a[1] - tr)) - (Math.abs(b[0] - tc) + Math.abs(b[1] - tr)));
       const srcs = ns.map(([nc, nr]) => { const o = grid[nc][nr]; grid[nc][nr] = null; return o; });
       merges += ns.length;                       // a 3-way merge counts as 2, a 4-way as 3
       if (lv) lv.bestMerge = Math.max(lv.bestMerge, ns.length + 1);
       const infPair = t.v >= INF;                // ∞ + ∞: both clear away for a bonus
       await bubbleMerge(t, srcs, t.v * Math.pow(2, ns.length)); // ×2, ×4, ×8, ×16 ... (doubles per extra block)
-      const tp = find(t) || [hc, tr];
+      const tp = find(t) || [tc, tr];
       if (infPair) clearInfinity(t, tp);
       else addScore(t.v, tp[0], tp[1]);
       await sleep(srcs.length === 1 ? 100 : 130);
