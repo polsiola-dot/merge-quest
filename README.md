@@ -71,6 +71,7 @@ All need Playwright and run headless Chromium. `tools/bot.js` is the shared gree
 | `tools/sim.js`, `tools/levels.js`, `tools/daily.js`, `tools/bot.js` | Balance-testing bots (Endless, Levels, Daily) and their shared player |
 | `docs/roadmap.md` | Plan and design rules |
 | `docs/art-prompts.md` | Image prompts for the final artwork |
+| `docs/sound-prompts.md` | ElevenLabs prompts for the sound effects |
 | `fonts/` | Bundled Fredoka and Lilita One fonts |
 | `music/` | Background music (`home.mp3` loops on the home screen) |
 
